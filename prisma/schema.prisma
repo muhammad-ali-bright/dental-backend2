@@ -8,11 +8,13 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(uuid())
-  email        String        @unique
-  password     String
-  role         String
-  appointments Appointment[]
+  id          String        @id
+  email       String        @unique
+  role        String
+  firstName   String
+  lastName    String
+  // …other fields…
+  Appointment Appointment[]
 }
 
 model Patient {

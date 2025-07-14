@@ -2,13 +2,15 @@ const prisma = require('../prisma/client');
 
 exports.createAppointment = async (req, res) => {
   try {
-    const { title, date, time, notes, patientId, studentId } = req.body;
+    const { title, description, appointmentDate, patientId, status } = req.body;
+    const studentId = req.user.user_id;
+
     const appointment = await prisma.appointment.create({
       data: {
         title,
-        date: new Date(date),
-        time,
-        notes,
+        date: new Date(appointmentDate),
+        time: appointmentDate,
+        notes: description,
         patientId,
         studentId,
       },

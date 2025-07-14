@@ -1,23 +1,39 @@
-const express = require('express');
-const cors = require('cors');
-const dotenv = require('dotenv');
-dotenv.config();
+// server.js
+require('dotenv').config()
 
-const secureRoutes = require('./routes/secure.route'); // Import secure routes
+const express = require('express')
+const cors = require('cors')
 
-const app = express();
-app.use(cors());
-app.use(express.json());
+const authenticate = require('./middleware/authenticate')
+const authRoutes = require('./routes/auth.routes')
+const usersRoutes = require('./routes/users.routes')
+const patientRoutes = require('./routes/patient.routes')
+const appointmentRoutes = require('./routes/appointment.routes')
 
-// Use the secure routes with Firebase token verification
-// app.use('/api', secureRoutes);
+const app = express()
 
-app.use('/api/patients', require('./routes/patient.routes'));
-app.use('/api/appointments', require('./routes/appointment.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
+// ——— Global Middleware ———
+app.use(cors())
+app.use(express.json())
 
-app.get('/', (req, res) => res.send('Denta API Running'));
+// ——— Public Routes ———
+// signup, login, etc.
+app.use('/api/auth', authRoutes)
 
+// ——— Protected Routes ———
+// /api/users/me (inside users.routes.js we call `authenticate` on that GET)
+// you could also do: app.use('/api/users', authenticate, usersRoutes)
+app.use('/api/users', usersRoutes)
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Patients & appointments require a valid Firebase token
+app.use('/api/patients', authenticate, patientRoutes)
+app.use('/api/appointments', authenticate, appointmentRoutes)
+
+// ——— Health Check ———
+app.get('/', (req, res) => res.send('Denta API Running'))
+
+// ——— Start Server ———
+const PORT = process.env.PORT || 5001
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`)
+})

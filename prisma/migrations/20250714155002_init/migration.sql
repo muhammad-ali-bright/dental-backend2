@@ -1,9 +1,14 @@
+DROP TABLE IF EXISTS "User" CASCADE;
+DROP TABLE IF EXISTS "Patient" CASCADE;
+DROP TABLE IF EXISTS "Appointment" CASCADE;
+
 -- CreateTable
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "role" TEXT NOT NULL,
+    "firstName" TEXT NOT NULL,
+    "lastName" TEXT NOT NULL,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
@@ -12,9 +17,9 @@ CREATE TABLE "User" (
 CREATE TABLE "Patient" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "dateOfBirth" TIMESTAMP(3) NOT NULL,
+    "contact" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
     "notes" TEXT,
-    "studentId" TEXT NOT NULL,
 
     CONSTRAINT "Patient_pkey" PRIMARY KEY ("id")
 );
@@ -34,9 +39,6 @@ CREATE TABLE "Appointment" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
-
--- AddForeignKey
-ALTER TABLE "Patient" ADD CONSTRAINT "Patient_studentId_fkey" FOREIGN KEY ("studentId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Appointment" ADD CONSTRAINT "Appointment_patientId_fkey" FOREIGN KEY ("patientId") REFERENCES "Patient"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

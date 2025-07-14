@@ -1,68 +1,33 @@
-const prisma = require('../prisma/client');
-const admin = require('../../firebase/firebase');
-const bcrypt = require('bcrypt');
-
-exports.login = async (req, res) => {
-    const { token } = req.body;
-
-    try {
-        // Step 1: Verify Firebase Token (async)
-        const verifyTokenPromise = admin.auth().verifyIdToken(token);
-
-        // Step 2: Query the user from DB (async)
-        const userQueryPromise = verifyTokenPromise.then(decoded => {
-            return prisma.user.findUnique({
-                where: { id: decoded.uid },
-                select: { id: true, email: true, role: true },
-            });
-        });
-
-        // Step 3: Await both promises to resolve
-        const [decoded, user] = await Promise.all([verifyTokenPromise, userQueryPromise]);
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found in DB' });
-        }
-
-        res.status(200).json(user);
-    } catch (err) {
-        console.error('Error during token verification or DB query:', err);
-        res.status(401).json({ error: 'Invalid token or user not found' });
-    }
-}
+// controllers/auth.controller.js
+const prisma = require('../prisma/client')
+const admin = require('../../firebase/firebase')
 
 exports.register = async (req, res) => {
-    const { email, password, role } = req.body;
-  
-    try {
-      const userRecord = await admin.auth().createUser({
-        email,
-        password,
-      });
-  
-      // Wait for Firebase to propagate the user record (1-second delay)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-  
-      // Hash the password
-      const hashedPassword = await bcrypt.hash(password, 10);
-  
-      // Set custom claims (role)
-      await admin.auth().setCustomUserClaims(userRecord.uid, { role });
-  
-      // Save user data to Prisma DB
-      await prisma.user.create({
-        data: {
-          id: userRecord.uid,
-          email,
-          password: hashedPassword,
-          role,
-        },
-      });
-  
-      return res.status(200).json({ message: 'User registered successfully!' });
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({ error: error.message });
-    }
-  };
-  
+  const { role, firstName, lastName } = req.body
+  const authHeader = req.headers.authorization || ''
+  const idToken = authHeader.split(' ')[1]
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken)
+    const uid = decoded.uid
+
+    // attach role claim
+    await admin.auth().setCustomUserClaims(uid, { role })
+
+    // create the user record in your DB
+    const user = await prisma.user.create({
+      data: {
+        id: uid,
+        email: decoded.email,
+        role,
+        firstName,
+        lastName
+      }
+    })
+
+    res.status(201).json({ message: 'User registered successfully!', user })
+  } catch (err) {
+    console.error('Registration error:', err)
+    res.status(500).json({ error: err.message })
+  }
+}

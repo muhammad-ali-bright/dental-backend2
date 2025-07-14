@@ -19,6 +19,7 @@ exports.createPatient = async (req, res) => {
 exports.getPatients = async (req, res) => {
   try {
     const patients = await prisma.patient.findMany();
+    console.log('Retrieved patients:', patients);
     return res.status(200).json(patients);
   } catch (err) {
     res.status(500).json({ error: err.message });

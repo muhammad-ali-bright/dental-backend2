@@ -1,5 +1,6 @@
 require('dotenv').config();
 const admin = require('firebase-admin');
+// const serviceAccount = require('./firebase_account.json'); // Reference the JSON file directly
 
 const serviceAccount = {
   type: process.env.FIREBASE_TYPE,
