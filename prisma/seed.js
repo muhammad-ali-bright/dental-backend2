@@ -2,7 +2,6 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  return;
   // Clear existing data
   await prisma.appointment.deleteMany();
   await prisma.patient.deleteMany();
@@ -15,6 +14,8 @@ async function main() {
       name: 'Student One',
       email: 'student@example.com',
       role: 'student',
+      firstName: 'Student',
+      lastName: 'One',
     },
   });
 
@@ -24,6 +25,8 @@ async function main() {
       name: 'Professor One',
       email: 'prof@example.com',
       role: 'professor',
+      firstName: 'Professor',
+      lastName: 'One',
     },
   });
 
