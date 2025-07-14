@@ -16,7 +16,7 @@ exports.register = async (req, res) => {
 
     console.log("999999999999999999999999999", uid);
     // create the user record in your DB
-    const user = await prisma.patient.findMany({
+    const user = await prisma.user.findMany({
     })
     console.log("999999999999999999999999999", user);
     // const user = await prisma.user.create({
