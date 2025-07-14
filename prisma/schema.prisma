@@ -14,14 +14,12 @@ model User {
   firstName   String
   lastName    String
   password    String?
-  // …other fields…
   Appointment Appointment[]
 }
 
 model Patient {
   id           String        @id @default(uuid())
   name         String
-  // dob          DateTime
   contact      String
   email        String
   notes        String?
