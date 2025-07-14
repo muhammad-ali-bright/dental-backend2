@@ -3,7 +3,6 @@ const prisma = require('../prisma/client')
 const admin = require('../../firebase/firebase')
 
 exports.register = async (req, res) => {
-  console.log("*******************************************");
   const { role, firstName, lastName } = req.body
   const authHeader = req.headers.authorization || ''
   const idToken = authHeader.split(' ')[1]
@@ -15,9 +14,11 @@ exports.register = async (req, res) => {
     // attach role claim
     await admin.auth().setCustomUserClaims(uid, { role })
 
+    console.log("999999999999999999999999999", uid);
     // create the user record in your DB
     const user = await prisma.user.findMany({
     })
+    console.log("999999999999999999999999999", user);
     // const user = await prisma.user.create({
     //   data: {
     //     id: uid,
