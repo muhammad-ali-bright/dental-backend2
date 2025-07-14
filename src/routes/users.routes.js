@@ -16,8 +16,8 @@ router.get('/me', authenticate, async (req, res) => {
                 id: true,
                 email: true,
                 role: true,
-                firstName: true,   // ← include firstName
-                lastName: true     // ← include lastName
+                // firstName: true,   // ← include firstName
+                // lastName: true     // ← include lastName
             }
         })
         console.log("8888888888888888888888888888888888888888888")
