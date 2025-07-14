@@ -3,6 +3,7 @@ const prisma = require('../prisma/client')
 const admin = require('../../firebase/firebase')
 
 exports.register = async (req, res) => {
+  console.log("*******************************************");
   const { role, firstName, lastName } = req.body
   const authHeader = req.headers.authorization || ''
   const idToken = authHeader.split(' ')[1]
