@@ -14,19 +14,16 @@ exports.register = async (req, res) => {
     // attach role claim
     await admin.auth().setCustomUserClaims(uid, { role })
 
-    console.log(await prisma.user.findMany({
-    }))
-
     // create the user record in your DB
-    const user = await prisma.user.create({
-      data: {
-        id: uid,
-        email: decoded.email,
-        role,
-        firstName,
-        lastName
-      }
-    })
+    // const user = await prisma.user.create({
+    //   data: {
+    //     id: uid,
+    //     email: decoded.email,
+    //     role,
+    //     firstName,
+    //     lastName
+    //   }
+    // })
 
     res.status(201).json({ message: 'User registered successfully!', user })
   } catch (err) {
