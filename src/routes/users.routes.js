@@ -9,6 +9,7 @@ const router = express.Router()
 router.get('/me', authenticate, async (req, res) => {
     try {
         const userId = req.user.uid
+        console.log("**********************************************")
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {
@@ -19,6 +20,8 @@ router.get('/me', authenticate, async (req, res) => {
                 lastName: true     // ← include lastName
             }
         })
+        console.log("8888888888888888888888888888888888888888888")
+
 
         if (!user) {
             return res.status(404).json({ error: 'User not found' })
