@@ -6,6 +6,7 @@ exports.register = async (req, res) => {
   const { role, firstName, lastName } = req.body
   const authHeader = req.headers.authorization || ''
   const idToken = authHeader.split(' ')[1]
+  console.log("11111111111111111111111111111111");
 
   try {
     const decoded = await admin.auth().verifyIdToken(idToken)
@@ -14,6 +15,7 @@ exports.register = async (req, res) => {
     // attach role claim
     await admin.auth().setCustomUserClaims(uid, { role })
 
+    console.log("22222222222222222222222222222222");
     // create the user record in your DB
     const user = await prisma.user.create({
       data: {
