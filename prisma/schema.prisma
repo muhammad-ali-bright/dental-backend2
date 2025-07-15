@@ -13,7 +13,6 @@ model User {
   role        String
   firstName   String
   lastName    String
-  password    String?
   Appointment Appointment[]
 }
 
