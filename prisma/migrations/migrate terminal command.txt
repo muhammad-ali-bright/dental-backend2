@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS "Appointment" CASCADE;
+DROP TABLE IF EXISTS "Patient" CASCADE;
+DROP TABLE IF EXISTS "User" CASCADE;
+
+psql "postgresql://dental_tgyr_user:KVsPVXJnyNBNPJOIe7KrPoP2NOuxW9pG@dpg-d1oj7djuibrs73crs2m0-a.oregon-postgres.render.com/dental_tgyr" -f migration.sql
+
