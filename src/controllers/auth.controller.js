@@ -17,7 +17,7 @@ exports.register = async (req, res) => {
     console.log('3333333333333333', uid, role)
 
     const user = await prisma.user.create({
-      data: { id: uid, email, role, firstName, lastName, password: "aa" } // Password is not stored, as per the schema
+      data: { id: uid, email, role, firstName, lastName } // Password is not stored, as per the schema
     })
 
     console.log('4444444444444444', user)
