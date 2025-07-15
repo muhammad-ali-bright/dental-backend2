@@ -8,9 +8,10 @@ exports.createAppointment = async (req, res) => {
     const appointment = await prisma.appointment.create({
       data: {
         title,
-        date: new Date(appointmentDate),
+        appointmentDate: new Date(appointmentDate),
         time: appointmentDate,
-        notes: description,
+        description,
+        status,
         patientId,
         studentId,
       },
@@ -34,28 +35,78 @@ exports.getAppointmentById = async (req, res) => {
 
 exports.getAppointmentsByStudentId = async (req, res) => {
   try {
-    const studentId = req.query.student_id;
-    const appointments = await prisma.appointment.findMany({
-      where: { studentId },
-      include: { patient: true },
+    const { startIdx = 0, endIdx = 10, searchTerm, sort = 'asc' } = req.query;
+    const studentId = req.user?.uid;
+
+    const totalCount = await prisma.appointment.count({
+      where: { studentId }
     });
-    res.json(appointments);
+
+    const where = {
+      studentId,
+      ...(searchTerm && {
+        OR: [
+          {
+            title: {
+              contains: searchTerm,
+              mode: 'insensitive'
+            }
+          },
+          {
+            description: {
+              contains: searchTerm,
+              mode: 'insensitive'
+            }
+          }
+        ]
+      })
+    }
+
+    const appointments = await prisma.appointment.findMany({
+      where,
+      orderBy: {
+        appointmentDate: sort.toLowerCase() === 'desc' ? 'desc' : 'asc'
+      },
+      skip: Number(startIdx),
+      take: Number(endIdx) - Number(startIdx)
+    });
+
+    return res.status(200).json({ appointments, totalCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
 exports.updateAppointment = async (req, res) => {
+  // 1) Destructure out any fields you don’t want to write back
+  const {
+    id,                // drop this (we use req.params.id)
+    appointmentDate,   // raw string from client, e.g. "2025-07-20"
+    time,              // raw string from client, e.g. "14:30"
+    ...rest            // everything else (title, description, status, patientId, studentId…)
+  } = req.body;
+
+  // 2) Build your data payload
+  const data = {
+    ...rest,
+    // convert appointmentDate `"YYYY-MM-DD"` → JS Date
+    appointmentDate: new Date(appointmentDate),
+    // ensure time stays a string (e.g. "14:30")
+    time: time,
+  };
+
   try {
     const updated = await prisma.appointment.update({
       where: { id: req.params.id },
-      data: req.body,
+      data,
     });
     res.json(updated);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
+
 
 exports.deleteAppointment = async (req, res) => {
   try {

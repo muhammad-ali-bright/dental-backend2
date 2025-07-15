@@ -14,6 +14,7 @@ model User {
   firstName   String
   lastName    String
   Appointment Appointment[]
+  Patient     Patient[]
 }
 
 model Patient {
@@ -22,17 +23,20 @@ model Patient {
   contact      String
   email        String
   notes        String?
+  studentId    String
+  student      User          @relation(fields: [studentId], references: [id])
   appointments Appointment[]
 }
 
 model Appointment {
-  id        String   @id @default(uuid())
-  title     String
-  date      DateTime
-  time      String
-  notes     String?
-  patientId String
-  studentId String
-  patient   Patient  @relation(fields: [patientId], references: [id])
-  student   User     @relation(fields: [studentId], references: [id])
+  id              String   @id @default(uuid())
+  title           String
+  appointmentDate DateTime
+  time            String
+  description     String?
+  status          String?
+  patientId       String
+  studentId       String
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  student         User     @relation(fields: [studentId], references: [id])
 }
