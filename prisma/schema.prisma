@@ -26,6 +26,10 @@ model Patient {
   studentId    String
   student      User          @relation(fields: [studentId], references: [id])
   appointments Appointment[]
+
+  @@index([studentId])
+  @@index([name])
+  @@index([email])
 }
 
 model Appointment {
@@ -37,6 +41,10 @@ model Appointment {
   status          String?
   patientId       String
   studentId       String
-  patient         Patient  @relation(fields: [patientId], references: [id])
+  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   student         User     @relation(fields: [studentId], references: [id])
+
+  @@index([patientId])
+  @@index([studentId])
+  @@index([appointmentDate])
 }

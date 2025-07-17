@@ -13,7 +13,13 @@ exports.createPatient = async (req, res) => {
     }
 
     const newPatient = await prisma.patient.create({
-      data: { name, notes, email, contact, studentId },
+      data: {
+        name,
+        notes,
+        email,
+        contact,
+        studentId,
+      },
     });
 
     console.log('[Patient Created]', newPatient.id);
@@ -25,35 +31,34 @@ exports.createPatient = async (req, res) => {
 };
 
 /**
- * Get all patients for the authenticated student
+ * Retrieve paginated and optionally filtered patients for the authenticated student
  */
 exports.getPatients = async (req, res) => {
   try {
     const { startIdx = 0, endIdx = 10, searchTerm, sort = 'asc' } = req.query;
     const studentId = req.user?.uid;
 
-    const totalCount = await prisma.patient.count({
-      where: { studentId }
-    });
-
-    const where = {
+    const whereClause = {
       studentId,
       ...(searchTerm && {
         name: {
           contains: searchTerm,
-          mode: 'insensitive'
-        }
-      })
+          mode: 'insensitive',
+        },
+      }),
     };
 
-    const patients = await prisma.patient.findMany({
-      where,
-      orderBy: {
-        name: sort.toLowerCase() === 'desc' ? 'desc' : 'asc'
-      },
-      skip: Number(startIdx),
-      take: Number(endIdx) - Number(startIdx)
-    });
+    const [patients, totalCount] = await Promise.all([
+      prisma.patient.findMany({
+        where: whereClause,
+        orderBy: {
+          name: sort.toLowerCase() === 'desc' ? 'desc' : 'asc',
+        },
+        skip: Number(startIdx),
+        take: Number(endIdx) - Number(startIdx),
+      }),
+      prisma.patient.count({ where: { studentId } }),
+    ]);
 
     return res.status(200).json({ patients, totalCount });
   } catch (error) {
@@ -62,6 +67,9 @@ exports.getPatients = async (req, res) => {
   }
 };
 
+/**
+ * Fetch patient IDs and names for dropdowns/lists
+ */
 exports.getPatientNames = async (req, res) => {
   try {
     const studentId = req.user?.uid;
@@ -69,32 +77,32 @@ exports.getPatientNames = async (req, res) => {
     const patientNames = await prisma.patient.findMany({
       where: { studentId },
       select: {
-        id:   true,
+        id: true,
         name: true,
       },
     });
 
     return res.status(200).json(patientNames);
   } catch (error) {
-    console.error('[Get Patients Error]', error);
-    return res.status(500).json({ error: 'Failed to retrieve patients.' });
+    console.error('[Get Patient Names Error]', error);
+    return res.status(500).json({ error: 'Failed to retrieve patient names.' });
   }
 };
 
 /**
- * Update an existing patient by ID
+ * Update an existing patient record by ID
  */
 exports.updatePatient = async (req, res) => {
   try {
     const patientId = req.params.id;
     const updates = req.body;
 
-    const updated = await prisma.patient.update({
+    const updatedPatient = await prisma.patient.update({
       where: { id: patientId },
       data: updates,
     });
 
-    return res.status(200).json(updated);
+    return res.status(200).json(updatedPatient);
   } catch (error) {
     console.error('[Update Patient Error]', error);
     return res.status(500).json({ error: 'Failed to update patient.' });
@@ -102,27 +110,24 @@ exports.updatePatient = async (req, res) => {
 };
 
 /**
- * Delete a patient and all their appointments
+ * Delete a patient and their associated appointments
  */
 exports.deletePatient = async (req, res) => {
   try {
     const studentId = req.user?.uid;
     const patientId = req.params.id;
 
-    // Optional: Verify ownership before delete (security best practice)
-    const patient = await prisma.patient.findUnique({
-      where: { id: patientId },
-    });
-
+    const patient = await prisma.patient.findUnique({ where: { id: patientId } });
     if (!patient || patient.studentId !== studentId) {
       return res.status(403).json({ error: 'Unauthorized or patient not found.' });
     }
 
-    const deleted = await prisma.patient.delete({
-      where: { id: patientId },
-    });
+    const result = await prisma.$transaction([
+      prisma.appointment.deleteMany({ where: { patientId } }),
+      prisma.patient.delete({ where: { id: patientId } }),
+    ]);
 
-    return res.status(200).json({ deleted });
+    return res.status(200).json({ message: 'Patient and appointments deleted successfully', result });
   } catch (error) {
     console.error('[Delete Patient Error]', error);
     return res.status(500).json({ error: 'Failed to delete patient.' });

@@ -77,6 +77,29 @@ exports.getAppointmentsByStudentId = async (req, res) => {
   }
 };
 
+exports.getAppointmentsByDateRange = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const studentId = req.user?.uid;
+
+    const appointments = await prisma.appointment.findMany({
+      where: {
+        studentId,
+        appointmentDate: {
+          gte: new Date(startDate),
+          lte: new Date(endDate),
+        },
+      },
+      orderBy: {
+        appointmentDate: 'asc',
+      },
+    });
+    res.status(200).json(appointments);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 exports.updateAppointment = async (req, res) => {
   // 1) Destructure out any fields you don’t want to write back
   const {

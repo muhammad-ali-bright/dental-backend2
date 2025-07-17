@@ -4,9 +4,10 @@ const controller = require('../controllers/appointment.controller');
 
 const verifyFirebaseToken = require('../middleware/verifyFirebaseToken'); // Import the Firebase token verification middleware
 
-router.post('/', verifyFirebaseToken, controller.createAppointment);
-router.get('/:id', verifyFirebaseToken, controller.getAppointmentById);
 router.get('/', verifyFirebaseToken, controller.getAppointmentsByStudentId);
+router.get('/dateRange', verifyFirebaseToken, controller.getAppointmentsByDateRange);
+router.get('/:id', verifyFirebaseToken, controller.getAppointmentById);
+router.post('/', verifyFirebaseToken, controller.createAppointment);
 router.put('/:id', verifyFirebaseToken, controller.updateAppointment);
 router.delete('/:id', verifyFirebaseToken, controller.deleteAppointment);
 
