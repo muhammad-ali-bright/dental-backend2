@@ -24,6 +24,7 @@ router.get('/format_firebase', (req, res) => {
     };
     deleteAllUsers().then(() => {
         console.log('All users deleted.');
+        return true;
     }).catch(error => {
         console.error('Error deleting users:', error);
     });

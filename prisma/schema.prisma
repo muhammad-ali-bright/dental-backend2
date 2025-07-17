@@ -33,18 +33,18 @@ model Patient {
 }
 
 model Appointment {
-  id              String   @id @default(uuid())
-  title           String
-  appointmentDate DateTime
-  time            String
-  description     String?
-  status          String?
-  patientId       String
-  studentId       String
-  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  student         User     @relation(fields: [studentId], references: [id])
+  id          String   @id @default(uuid())
+  title       String
+  date        DateTime
+  time        String
+  description String?
+  status      String?
+  patientId   String
+  studentId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  student     User     @relation(fields: [studentId], references: [id])
 
   @@index([patientId])
   @@index([studentId])
-  @@index([appointmentDate])
+  @@index([date])
 }

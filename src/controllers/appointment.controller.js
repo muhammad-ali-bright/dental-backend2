@@ -2,14 +2,14 @@ const prisma = require('../prisma/client');
 
 exports.createAppointment = async (req, res) => {
   try {
-    const { title, description, appointmentDate, patientId, status } = req.body;
+    const { title, description, date, patientId, status } = req.body;
     const studentId = req.user.user_id;
 
     const appointment = await prisma.appointment.create({
       data: {
         title,
-        appointmentDate: new Date(appointmentDate),
-        time: appointmentDate,
+        date: new Date(date),
+        time: date,
         description,
         status,
         patientId,
@@ -65,7 +65,7 @@ exports.getAppointmentsByStudentId = async (req, res) => {
     const appointments = await prisma.appointment.findMany({
       where,
       orderBy: {
-        appointmentDate: sort.toLowerCase() === 'desc' ? 'desc' : 'asc'
+        date: sort.toLowerCase() === 'desc' ? 'desc' : 'asc'
       },
       skip: Number(startIdx),
       take: Number(endIdx) - Number(startIdx)
@@ -85,13 +85,13 @@ exports.getAppointmentsByDateRange = async (req, res) => {
     const appointments = await prisma.appointment.findMany({
       where: {
         studentId,
-        appointmentDate: {
+        date: {
           gte: new Date(startDate),
           lte: new Date(endDate),
         },
       },
       orderBy: {
-        appointmentDate: 'asc',
+        date: 'asc',
       },
     });
     res.status(200).json(appointments);
@@ -104,7 +104,7 @@ exports.updateAppointment = async (req, res) => {
   // 1) Destructure out any fields you don’t want to write back
   const {
     id,                // drop this (we use req.params.id)
-    appointmentDate,   // raw string from client, e.g. "2025-07-20"
+    date,   // raw string from client, e.g. "2025-07-20"
     time,              // raw string from client, e.g. "14:30"
     ...rest            // everything else (title, description, status, patientId, studentId…)
   } = req.body;
@@ -112,8 +112,8 @@ exports.updateAppointment = async (req, res) => {
   // 2) Build your data payload
   const data = {
     ...rest,
-    // convert appointmentDate `"YYYY-MM-DD"` → JS Date
-    appointmentDate: new Date(appointmentDate),
+    // convert date `"YYYY-MM-DD"` → JS Date
+    date: new Date(date),
     // ensure time stays a string (e.g. "14:30")
     time: time,
   };
