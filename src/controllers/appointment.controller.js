@@ -11,7 +11,13 @@ exports.createAppointment = async (req, res) => {
       endTime,      // "15:00"
       patientId,
       status = 'Scheduled',
+      color = "blue"
     } = req.body;
+
+    // parse "YYYY‑MM‑DD" into year, monthIndex, day
+    const [Y, M, D] = date.split("-").map(Number);
+    // monthIndex is zero‑based!<
+    const localMidnight = new Date(Y, M - 1, D);
 
     const studentId = req.user?.uid;
 
@@ -19,14 +25,17 @@ exports.createAppointment = async (req, res) => {
       data: {
         title,
         description,
-        date: new Date(date), // Stores only the date
+        date: localMidnight, // Stores only the date
         startTime,
         endTime,
         status,
         patientId,
         studentId,
+        color
       },
     });
+
+    console.log(appointment);
 
     res.status(201).json(appointment);
   } catch (err) {

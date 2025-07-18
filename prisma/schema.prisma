@@ -41,6 +41,7 @@ model Appointment {
   endTime     String? // e.g. "14:30"
   description String?
   status      String?
+  color       String?
   patientId   String
   studentId   String
   patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
