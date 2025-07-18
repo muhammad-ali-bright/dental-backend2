@@ -36,7 +36,9 @@ model Appointment {
   id          String   @id @default(uuid())
   title       String
   date        DateTime
-  time        String
+  time        String?
+  startTime   String? // e.g. "13:00"
+  endTime     String? // e.g. "14:30"
   description String?
   status      String?
   patientId   String

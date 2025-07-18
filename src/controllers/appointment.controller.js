@@ -1,27 +1,40 @@
 const prisma = require('../prisma/client');
 
+// CREATE
 exports.createAppointment = async (req, res) => {
   try {
-    const { title, description, date, patientId, status } = req.body;
-    const studentId = req.user.user_id;
+    const {
+      title,
+      description,
+      date,         // "2025-07-21"
+      startTime,    // "14:00"
+      endTime,      // "15:00"
+      patientId,
+      status = 'Scheduled',
+    } = req.body;
+
+    const studentId = req.user?.uid;
 
     const appointment = await prisma.appointment.create({
       data: {
         title,
-        date: new Date(date),
-        time: date,
         description,
+        date: new Date(date), // Stores only the date
+        startTime,
+        endTime,
         status,
         patientId,
         studentId,
       },
     });
-    res.json(appointment);
+
+    res.status(201).json(appointment);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
+// GET BY ID
 exports.getAppointmentById = async (req, res) => {
   try {
     const appointment = await prisma.appointment.findUnique({
@@ -33,50 +46,38 @@ exports.getAppointmentById = async (req, res) => {
   }
 };
 
+// GET LIST (WITH PAGINATION / SEARCH)
 exports.getAppointmentsByStudentId = async (req, res) => {
   try {
     const { startIdx = 0, endIdx = 10, searchTerm, sort = 'asc' } = req.query;
     const studentId = req.user?.uid;
 
-    const totalCount = await prisma.appointment.count({
-      where: { studentId }
-    });
-
     const where = {
       studentId,
       ...(searchTerm && {
         OR: [
-          {
-            title: {
-              contains: searchTerm,
-              mode: 'insensitive'
-            }
-          },
-          {
-            description: {
-              contains: searchTerm,
-              mode: 'insensitive'
-            }
-          }
-        ]
-      })
-    }
+          { title: { contains: searchTerm, mode: 'insensitive' } },
+          { description: { contains: searchTerm, mode: 'insensitive' } },
+        ],
+      }),
+    };
+
+    const totalCount = await prisma.appointment.count({ where });
 
     const appointments = await prisma.appointment.findMany({
       where,
-      orderBy: {
-        date: sort.toLowerCase() === 'desc' ? 'desc' : 'asc'
-      },
+      orderBy: { date: sort.toLowerCase() === 'desc' ? 'desc' : 'asc' },
       skip: Number(startIdx),
-      take: Number(endIdx) - Number(startIdx)
+      take: Number(endIdx) - Number(startIdx),
     });
 
-    return res.status(200).json({ appointments, totalCount });
+    res.status(200).json({ appointments, totalCount });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
+// GET BY DATE RANGE (CALENDAR USE)
 exports.getAppointmentsByDateRange = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -94,35 +95,35 @@ exports.getAppointmentsByDateRange = async (req, res) => {
         date: 'asc',
       },
     });
+
     res.status(200).json(appointments);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
+// UPDATE
 exports.updateAppointment = async (req, res) => {
-  // 1) Destructure out any fields you don’t want to write back
-  const {
-    id,                // drop this (we use req.params.id)
-    date,   // raw string from client, e.g. "2025-07-20"
-    time,              // raw string from client, e.g. "14:30"
-    ...rest            // everything else (title, description, status, patientId, studentId…)
-  } = req.body;
-
-  // 2) Build your data payload
-  const data = {
-    ...rest,
-    // convert date `"YYYY-MM-DD"` → JS Date
-    date: new Date(date),
-    // ensure time stays a string (e.g. "14:30")
-    time: time,
-  };
-
   try {
+    const {
+      date,       // "2025-07-21"
+      startTime,  // "13:00"
+      endTime,    // "14:00"
+      ...rest     // title, description, patientId, status
+    } = req.body;
+
+    const data = {
+      ...rest,
+      date: new Date(date),
+      startTime,
+      endTime,
+    };
+
     const updated = await prisma.appointment.update({
       where: { id: req.params.id },
       data,
     });
+
     res.json(updated);
   } catch (err) {
     console.error(err);
@@ -130,10 +131,12 @@ exports.updateAppointment = async (req, res) => {
   }
 };
 
-
+// DELETE
 exports.deleteAppointment = async (req, res) => {
   try {
-    await prisma.appointment.delete({ where: { id: req.params.id } });
+    await prisma.appointment.delete({
+      where: { id: req.params.id },
+    });
     res.json({ message: 'Deleted successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/appointment.controller');
-
-const verifyFirebaseToken = require('../middleware/verifyFirebaseToken'); // Import the Firebase token verification middleware
+const verifyFirebaseToken = require('../middleware/verifyFirebaseToken');
 
 router.get('/', verifyFirebaseToken, controller.getAppointmentsByStudentId);
 router.get('/dateRange', verifyFirebaseToken, controller.getAppointmentsByDateRange);
