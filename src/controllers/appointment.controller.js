@@ -35,8 +35,6 @@ exports.createAppointment = async (req, res) => {
       },
     });
 
-    console.log(appointment);
-
     res.status(201).json(appointment);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -60,19 +58,32 @@ exports.getAppointmentsByStudentId = async (req, res) => {
   try {
     const { startIdx = 0, endIdx = 10, searchTerm, sort = 'asc' } = req.query;
     const studentId = req.user?.uid;
+    const role = req.user?.role;
 
-    const where = {
-      studentId,
-      ...(searchTerm && {
-        OR: [
-          { title: { contains: searchTerm, mode: 'insensitive' } },
-          { description: { contains: searchTerm, mode: 'insensitive' } },
-        ],
-      }),
-    };
+    let where = "";
+    if (role == "Student") {
+      where = {
+        studentId,
+        ...(searchTerm && {
+          OR: [
+            { title: { contains: searchTerm, mode: 'insensitive' } },
+            { description: { contains: searchTerm, mode: 'insensitive' } },
+          ],
+        }),
+      };
+    }
+    else {
+      where = {
+        ...(searchTerm && {
+          OR: [
+            { title: { contains: searchTerm, mode: 'insensitive' } },
+            { description: { contains: searchTerm, mode: 'insensitive' } },
+          ],
+        }),
+      };
+    }
 
     const totalCount = await prisma.appointment.count({ where });
-
     const appointments = await prisma.appointment.findMany({
       where,
       orderBy: { date: sort.toLowerCase() === 'desc' ? 'desc' : 'asc' },
@@ -91,20 +102,35 @@ exports.getAppointmentsByDateRange = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     const studentId = req.user?.uid;
+    const role = req.user?.role;
 
-    const appointments = await prisma.appointment.findMany({
-      where: {
-        studentId,
-        date: {
-          gte: new Date(startDate),
-          lte: new Date(endDate),
+    let appointments = null;
+    if(role == "Student") {
+      appointments = await prisma.appointment.findMany({
+        where: {
+          studentId,
+          date: {
+            gte: new Date(startDate),
+            lte: new Date(endDate),
+          },
         },
-      },
-      orderBy: {
-        date: 'asc',
-      },
-    });
-
+        orderBy: {
+          date: 'asc',
+        },
+      });
+    } else {
+      appointments = await prisma.appointment.findMany({
+        where: {
+          date: {
+            gte: new Date(startDate),
+            lte: new Date(endDate),
+          },
+        },
+        orderBy: {
+          date: 'asc',
+        },
+      });
+    }
     res.status(200).json(appointments);
   } catch (err) {
     res.status(500).json({ error: err.message });

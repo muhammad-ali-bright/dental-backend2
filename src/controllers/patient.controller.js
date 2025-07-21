@@ -36,17 +36,31 @@ exports.createPatient = async (req, res) => {
 exports.getPatients = async (req, res) => {
   try {
     const { startIdx = 0, endIdx = 10, searchTerm, sort = 'asc' } = req.query;
+    const role = req.user?.role;
     const studentId = req.user?.uid;
 
-    const whereClause = {
-      studentId,
-      ...(searchTerm && {
-        name: {
-          contains: searchTerm,
-          mode: 'insensitive',
-        },
-      }),
-    };
+    let whereClause = {};
+
+    if (role === "Student") {
+      whereClause = {
+        studentId,
+        ...(searchTerm && {
+          name: {
+            contains: searchTerm,
+            mode: 'insensitive',
+          },
+        }),
+      };
+    } else {
+      whereClause = {
+        ...(searchTerm && {
+          name: {
+            contains: searchTerm,
+            mode: 'insensitive',
+          },
+        }),
+      };
+    }
 
     const [patients, totalCount] = await Promise.all([
       prisma.patient.findMany({
@@ -72,15 +86,26 @@ exports.getPatients = async (req, res) => {
  */
 exports.getPatientNames = async (req, res) => {
   try {
+    const role = req.user?.role;
     const studentId = req.user?.uid;
 
-    const patientNames = await prisma.patient.findMany({
-      where: { studentId },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
+    let patientNames;
+    if (role == "Student") {
+      patientNames = await prisma.patient.findMany({
+        where: { studentId },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+    } else {
+      patientNames = await prisma.patient.findMany({
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+    }
 
     return res.status(200).json(patientNames);
   } catch (error) {
