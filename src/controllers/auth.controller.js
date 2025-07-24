@@ -13,7 +13,7 @@ exports.login = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).json({ success: false, result: 'User not found' });
+      return res.status(200).json({ success: false, result: 'Incorrect email or password. Please try again.' });
     }
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });

@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/appointment.controller');
-const verifyFirebaseToken = require('../middleware/verifyFirebaseToken');
 
 router.get('/', controller.getAppointments);
 router.get('/:id', controller.getAppointmentById);

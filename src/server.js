@@ -26,7 +26,6 @@ app.use('/api/auth', authRoutes)
 // you could also do: app.use('/api/users', authenticate, usersRoutes)
 app.use('/api/users', usersRoutes)
 
-// Patients & appointments require a valid Firebase token
 app.use('/api/patients', authenticate, patientRoutes)
 app.use('/api/appointments', authenticate, appointmentRoutes)
 

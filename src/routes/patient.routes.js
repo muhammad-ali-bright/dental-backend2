@@ -2,9 +2,6 @@ const express = require('express');
 const router = express.Router();
 const patientController = require('../controllers/patient.controller');
 
-const authenticate = require('../middleware/authenticate'); // Import the Firebase token verification middleware
-
-
 router.get('/', patientController.getPatients);
 router.post('/', patientController.createPatient);
 router.put('/:id', patientController.updatePatient);
