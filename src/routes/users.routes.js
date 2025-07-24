@@ -6,28 +6,27 @@ const authenticate = require('../middleware/authenticate')
 const router = express.Router()
 
 // GET /api/users/me
-router.get('/me', authenticate, async (req, res) => {
+router.get('/me', authenticate ,async (req, res) => {
     try {
-        const userId = req.user.uid
+        const userId = req.user.id
         const user = await prisma.user.findUnique({
             where: { id: userId },
             select: {
                 id: true,
                 email: true,
                 role: true,
-                firstName: true,   // ← include firstName
-                lastName: true     // ← include lastName
+                name: true
             }
         })
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' })
+            return res.status(401).json({ success: false, result: 'User not found' });
         }
 
-        res.json(user)
+        return res.status(201).json({success: true, result: user});
     } catch (err) {
         console.error('GET /users/me error:', err)
-        res.status(500).json({ error: 'Internal server error' })
+        return res.status(401).json({ success: false, result: 'Internal server error' });
     }
 })
 

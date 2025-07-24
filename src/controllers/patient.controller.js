@@ -35,9 +35,19 @@ exports.createPatient = async (req, res) => {
  */
 exports.getPatients = async (req, res) => {
   try {
-    const { startIdx = 0, endIdx = 10, searchTerm, sort = 'asc' } = req.query;
+    const { startIdx = 0, endIdx = 10, searchTerm, sort } = req.query;
     const role = req.user?.role;
     const studentId = req.user?.uid;
+    let sortField = null;
+    switch (sort) {
+      case "date":
+        sortField = "createdAt";
+        break;
+      case "name":
+        sortField = "name";
+      default:
+        break;
+    }
 
     let whereClause = {};
 
@@ -45,19 +55,21 @@ exports.getPatients = async (req, res) => {
       whereClause = {
         studentId,
         ...(searchTerm && {
-          name: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
+          OR: [
+            { name: { contains: searchTerm, mode: 'insensitive' } },
+            { contact: { contains: searchTerm, mode: 'insensitive' } },
+            { email: { contains: searchTerm, mode: 'insensitive' } },
+          ]
         }),
       };
     } else {
       whereClause = {
         ...(searchTerm && {
-          name: {
-            contains: searchTerm,
-            mode: 'insensitive',
-          },
+          OR: [
+            { name: { contains: searchTerm, mode: 'insensitive' } },
+            { contact: { contains: searchTerm, mode: 'insensitive' } },
+            { email: { contains: searchTerm, mode: 'insensitive' } },
+          ]
         }),
       };
     }
@@ -66,7 +78,7 @@ exports.getPatients = async (req, res) => {
       prisma.patient.findMany({
         where: whereClause,
         orderBy: {
-          name: sort.toLowerCase() === 'desc' ? 'desc' : 'asc',
+          [sortField]: 'asc',
         },
         skip: Number(startIdx),
         take: Number(endIdx) - Number(startIdx),
@@ -74,7 +86,7 @@ exports.getPatients = async (req, res) => {
       prisma.patient.count({ where: { studentId } }),
     ]);
 
-    return res.status(200).json({ patients, totalCount });
+    return res.status(200).json({ patients, totalCount});
   } catch (error) {
     console.error('[Get Patients Error]', error);
     return res.status(500).json({ error: 'Failed to retrieve patients.' });

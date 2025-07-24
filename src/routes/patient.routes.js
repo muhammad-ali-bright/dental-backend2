@@ -5,11 +5,11 @@ const patientController = require('../controllers/patient.controller');
 const authenticate = require('../middleware/authenticate'); // Import the Firebase token verification middleware
 
 
-router.post('/', authenticate, patientController.createPatient);
-router.get('/', authenticate, patientController.getPatients);
-router.put('/:id', authenticate, patientController.updatePatient);
-router.delete('/:id', authenticate, patientController.deletePatient);
+router.get('/', patientController.getPatients);
+router.post('/', patientController.createPatient);
+router.put('/:id', patientController.updatePatient);
+router.delete('/:id', patientController.deletePatient);
 
-router.get('/names', authenticate, patientController.getPatientNames);
+router.get('/names', patientController.getPatientNames);
 
 module.exports = router;

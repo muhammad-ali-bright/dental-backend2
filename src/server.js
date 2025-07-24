@@ -10,6 +10,7 @@ const usersRoutes = require('./routes/users.routes')
 const patientRoutes = require('./routes/patient.routes')
 const appointmentRoutes = require('./routes/appointment.routes')
 
+
 const app = express()
 
 // ——— Global Middleware ———

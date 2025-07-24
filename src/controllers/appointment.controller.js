@@ -53,49 +53,75 @@ exports.getAppointmentById = async (req, res) => {
   }
 };
 
-// GET LIST (WITH PAGINATION / SEARCH)
-exports.getAppointmentsByStudentId = async (req, res) => {
+exports.getAppointments = async (req, res) => {
   try {
-    const { startIdx = 0, endIdx = 10, searchTerm, sort = 'asc' } = req.query;
+    const {
+      startIdx = 0,
+      endIdx = 10,
+      searchTerm = '',
+      sort = 'desc', // frontend uses 'desc' as default
+      statusFilter = 'All',
+    } = req.query;
+
     const studentId = req.user?.uid;
     const role = req.user?.role;
 
-    let where = "";
-    if (role == "Student") {
-      where = {
-        studentId,
-        ...(searchTerm && {
-          OR: [
-            { title: { contains: searchTerm, mode: 'insensitive' } },
-            { description: { contains: searchTerm, mode: 'insensitive' } },
-          ],
-        }),
-      };
-    }
-    else {
-      where = {
-        ...(searchTerm && {
-          OR: [
-            { title: { contains: searchTerm, mode: 'insensitive' } },
-            { description: { contains: searchTerm, mode: 'insensitive' } },
-          ],
-        }),
-      };
+    // Build query filters
+    const filters = [];
+
+    // Restrict to student appointments
+    if (role === 'Student') {
+      filters.push({ studentId });
     }
 
-    const totalCount = await prisma.appointment.count({ where });
-    const appointments = await prisma.appointment.findMany({
-      where,
-      orderBy: { date: sort.toLowerCase() === 'desc' ? 'desc' : 'asc' },
-      skip: Number(startIdx),
-      take: Number(endIdx) - Number(startIdx),
-    });
+    // Optional search filter
+    if (searchTerm) {
+      filters.push({
+        OR: [
+          { title: { contains: searchTerm, mode: 'insensitive' } },
+          { description: { contains: searchTerm, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    // Optional status filter
+    if (statusFilter !== 'All') {
+      filters.push({ status: statusFilter });
+    }
+
+    const where = filters.length > 0 ? { AND: filters } : {};
+
+    const [appointments, totalCount] = await Promise.all([
+      prisma.appointment.findMany({
+        where,
+        orderBy: [
+          { date: sort === 'asc' ? 'asc' : 'desc' },
+          { startTime: 'asc' },
+        ],
+        skip: Number(startIdx),
+        take: Number(endIdx) - Number(startIdx),
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          status: true,
+          color: true,
+          patientId: true,
+        },
+      }),
+      prisma.appointment.count({ where }),
+    ]);
 
     res.status(200).json({ appointments, totalCount });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('[Get Appointments Error]', err);
+    res.status(500).json({ error: 'Failed to retrieve appointments.' });
   }
 };
+
 
 // GET BY DATE RANGE (CALENDAR USE)
 exports.getAppointmentsByDateRange = async (req, res) => {
@@ -105,7 +131,7 @@ exports.getAppointmentsByDateRange = async (req, res) => {
     const role = req.user?.role;
 
     let appointments = null;
-    if(role == "Student") {
+    if (role == "Student") {
       appointments = await prisma.appointment.findMany({
         where: {
           studentId,

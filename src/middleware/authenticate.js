@@ -1,19 +1,22 @@
 // middleware/authenticate.js
-const admin = require('../../firebase/firebase'); // Adjust the path as necessary
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET; // Make sure this is defined in your .env file
 
-module.exports = async function authenticate(req, res, next) {
+module.exports = function authenticate(req, res, next) {
     const header = req.headers.authorization;
+
     if (!header?.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Missing or malformed Authorization header' });
+        return res.status(401).json({ success: false, result: 'Missing or malformed Authorization header' });
     }
 
     const token = header.split(' ')[1];
+
     try {
-        const decoded = await admin.auth().verifyIdToken(token);
-        req.user = decoded;      // { uid, email, ...customClaims }
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded; // { id, role, etc. }
         next();
     } catch (err) {
-        console.error('Auth error:', err);
-        res.status(401).json({ error: 'Invalid or expired token' });
+        console.error('JWT auth error:', err);
+        return res.status(401).json({ success: false, result: 'Invalid or expired token' });
     }
 };

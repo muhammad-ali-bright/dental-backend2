@@ -8,46 +8,47 @@ datasource db {
 }
 
 model User {
-  id          String        @id
-  email       String        @unique
-  role        String
-  firstName   String
-  lastName    String
-  Appointment Appointment[]
-  Patient     Patient[]
+  id       String @id @default(cuid())
+  role     String
+  email    String @unique
+  name     String
+
+  patients  Patient[]
+  incidents Incident[]
 }
 
 model Patient {
-  id           String        @id @default(uuid())
-  name         String
-  contact      String
-  email        String
-  notes        String?
-  studentId    String
-  student      User          @relation(fields: [studentId], references: [id])
-  appointments Appointment[]
+  id               String   @id @default(cuid())
+  userId           String
+  name             String
+  dob              DateTime
+  contact          String
+  email            String   @unique
+  healthInfo       String
+  address          String
+  emergencyContact String? // optional
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  @@index([studentId])
-  @@index([name])
-  @@index([email])
+  user      User       @relation(fields: [userId], references: [id])
+  incidents Incident[]
 }
 
-model Appointment {
-  id          String   @id @default(uuid())
-  title       String
-  date        DateTime
-  time        String?
-  startTime   String? // e.g. "13:00"
-  endTime     String? // e.g. "14:30"
-  description String?
-  status      String?
-  color       String?
-  patientId   String
-  studentId   String
-  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  student     User     @relation(fields: [studentId], references: [id])
+model Incident {
+  id              String   @id @default(cuid())
+  userId          String
+  patientId       String
+  title           String
+  description     String
+  comments        String
+  appointmentDate DateTime
+  cost            Int
+  treatment       String
+  status          String
+  // files        Json?    // Uncomment if you plan to store files as metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  @@index([patientId])
-  @@index([studentId])
-  @@index([date])
+  user    User    @relation(fields: [userId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
 }

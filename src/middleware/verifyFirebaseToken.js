@@ -1,23 +1,19 @@
+// middleware/authenticate.js
+const admin = require('../../firebase/firebase'); // Adjust the path as necessary
 
-const admin = require('../../firebase/firebase');
-const verifyFirebaseToken = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+module.exports = async function verifyFirebaseToken(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or malformed Authorization header' });
   }
 
-  const token = authHeader.split(' ')[1];
-
+  const token = header.split(' ')[1];
   try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.user = decodedToken; // Attach decoded user data (including role)
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.user = decoded;      // { uid, email, ...customClaims }
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    console.error('Auth error:', err);
+    res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
-
-module.exports = verifyFirebaseToken;
-// This middleware can be used in your secure routes to verify Firebase tokens
-// and access user data, including custom claims like role. 

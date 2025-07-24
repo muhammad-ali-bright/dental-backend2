@@ -1,28 +1,49 @@
 // controllers/auth.controller.js
+const jwt = require("jsonwebtoken");
+const JWT_SECRET = process.env.JWT_SECRET;
+
 const prisma = require('../prisma/client')
-const admin = require('../../firebase/firebase')
 
-exports.register = async (req, res) => {
-  const { role, firstName, lastName } = req.body
-  const { uid, email } = req.user || {}
-
-  if (!email || !uid) {
-    return res.status(400).json({ error: 'Invalid user token' })
-  }
+exports.login = async (req, res) => {
+  const { email } = req.body;
 
   try {
-    await admin.auth().setCustomUserClaims(uid, { role })
+    const user = await prisma.user.findUnique({
+      where: { email }  // ✅ Correct usage
+    });
 
-    const user = await prisma.user.create({
-      data: { id: uid, email, role, firstName, lastName } // Password is not stored, as per the schema
-    })
-
-    res.status(201).json({ message: 'User registered successfully!', user })
-  } catch (err) {
-    console.error('Registration error:', err)
-    if (err.code === 'P2002') {
-      return res.status(409).json({ error: 'User already exists' })
+    if (!user) {
+      return res.status(404).json({ success: false, result: 'User not found' });
     }
-    res.status(500).json({ error: 'Internal server error' })
+
+    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+    // Password check logic goes here if you are storing password hashes
+    return res.status(200).json({ success: true, result: { token, user } });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({ success: false, result: 'Internal server error' });
   }
-}
+};
+
+
+exports.register = async (req, res) => {
+  const { role, name, email } = req.body;
+
+  try {
+    // 1. Check if user already exists
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(201).json({ success: false, result: 'User already exists' });
+    }
+
+    // 2. Create user
+    const newUser = await prisma.user.create({
+      data: { email, role, name }
+    });
+
+    res.status(201).json({ success: true, result: newUser });
+  } catch (err) {
+    console.error('Registration error:', err);
+    res.status(500).json({ success: false, result: 'interval server error' });
+  }
+};
