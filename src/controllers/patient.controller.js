@@ -1,32 +1,40 @@
 const prisma = require('../prisma/client');
 
-/**
- * Create a new patient for the authenticated student
- */
+// POST /patients
 exports.createPatient = async (req, res) => {
   try {
-    const studentId = req.user?.uid;
-    const { name, notes, email, contact } = req.body;
+    const {
+      name,
+      dob,
+      email,
+      contact,
+      emergencyContact = null,
+      healthInfo = '',
+      address = ''
+    } = req.body;
 
-    if (!name || !email || !contact) {
-      return res.status(400).json({ error: 'Name, email, and contact are required.' });
+    // Validate required fields
+    if (!name || !dob || !email || !contact) {
+      return res.status(400).json({ error: 'Missing required fields: name, dob, email, or contact.' });
     }
 
-    const newPatient = await prisma.patient.create({
-      data: {
-        name,
-        notes,
-        email,
-        contact,
-        studentId,
-      },
-    });
+    const payload = {
+      name: name.trim(),
+      dob: new Date(dob),
+      email: email.trim().toLowerCase(),
+      contact: contact.trim(),
+      emergencyContact: emergencyContact?.trim() || null,
+      healthInfo: healthInfo.trim(),
+      address: address.trim(),
+      userId: req.user.id,
+    };
 
-    console.log('[Patient Created]', newPatient.id);
-    return res.status(201).json(newPatient);
-  } catch (error) {
-    console.error('[Create Patient Error]', error);
-    return res.status(500).json({ error: 'Failed to create patient.' });
+    const patient = await prisma.patient.create({ data: payload });
+
+    return res.status(201).json(patient);
+  } catch (err) {
+    console.error('[createPatient]', err);
+    return res.status(500).json({ error: 'Internal server error while creating patient.' });
   }
 };
 
@@ -86,7 +94,7 @@ exports.getPatients = async (req, res) => {
       prisma.patient.count({ where: { studentId } }),
     ]);
 
-    return res.status(200).json({ patients, totalCount});
+    return res.status(200).json({ patients, totalCount });
   } catch (error) {
     console.error('[Get Patients Error]', error);
     return res.status(500).json({ error: 'Failed to retrieve patients.' });

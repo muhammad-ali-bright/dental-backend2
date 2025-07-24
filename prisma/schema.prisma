@@ -23,7 +23,7 @@ model Patient {
   name             String
   dob              DateTime
   contact          String
-  email            String   @unique
+  email            String
   healthInfo       String
   address          String
   emergencyContact String? // optional
