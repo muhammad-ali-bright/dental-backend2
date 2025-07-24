@@ -8,7 +8,7 @@ const authenticate = require('./middleware/authenticate')
 const authRoutes = require('./routes/auth.routes')
 const usersRoutes = require('./routes/users.routes')
 const patientRoutes = require('./routes/patient.routes')
-const appointmentRoutes = require('./routes/appointment.routes')
+const incidentRoutes = require('./routes/incident.routes')
 
 
 const app = express()
@@ -27,7 +27,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/users', usersRoutes)
 
 app.use('/api/patients', authenticate, patientRoutes)
-app.use('/api/appointments', authenticate, appointmentRoutes)
+app.use('/api/incidents', authenticate, incidentRoutes)
 
 // ——— Health Check ———
 app.get('/', (req, res) => res.send('Denta API Running'))

@@ -8,6 +8,6 @@ router.post('/', authenticate, patientController.createPatient);
 router.put('/:id', authenticate, patientController.updatePatient);
 router.delete('/:id', authenticate, patientController.deletePatient);
 
-router.get('/names', authenticate, patientController.getPatientNames);
+router.get('/dropdown', authenticate, patientController.getPatientNames);
 
 module.exports = router;

@@ -26,7 +26,7 @@ exports.createPatient = async (req, res) => {
       emergencyContact: emergencyContact?.trim() || null,
       healthInfo: healthInfo.trim(),
       address: address.trim(),
-      userId: req.user.id,
+      studentId: req.user.id,
     };
 
     const patient = await prisma.patient.create({ data: payload });
@@ -38,66 +38,46 @@ exports.createPatient = async (req, res) => {
   }
 };
 
-/**
- * Retrieve paginated and optionally filtered patients for the authenticated student
- */
+// GET /patients
 exports.getPatients = async (req, res) => {
   try {
-    const { startIdx = 0, endIdx = 10, searchTerm, sort } = req.query;
-    const role = req.user?.role;
-    const studentId = req.user?.uid;
-    let sortField = null;
-    switch (sort) {
-      case "date":
-        sortField = "createdAt";
-        break;
-      case "name":
-        sortField = "name";
-      default:
-        break;
-    }
+    const userId = req.user?.id;
+    const userRole = req.user?.role || 'Student';
+    // Parse and sanitize query params
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search?.trim() || '';
+    const sort = ['name', 'createdAt'].includes(req.query.sort) ? req.query.sort : 'name';
+    const order = req.query.order === 'asc' ? 'asc' : 'desc';
 
-    let whereClause = {};
+    // Construct filter
+    const where = {
+      ...(userRole === 'Student' && { studentId: userId }),
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { contact: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
 
-    if (role === "Student") {
-      whereClause = {
-        studentId,
-        ...(searchTerm && {
-          OR: [
-            { name: { contains: searchTerm, mode: 'insensitive' } },
-            { contact: { contains: searchTerm, mode: 'insensitive' } },
-            { email: { contains: searchTerm, mode: 'insensitive' } },
-          ]
-        }),
-      };
-    } else {
-      whereClause = {
-        ...(searchTerm && {
-          OR: [
-            { name: { contains: searchTerm, mode: 'insensitive' } },
-            { contact: { contains: searchTerm, mode: 'insensitive' } },
-            { email: { contains: searchTerm, mode: 'insensitive' } },
-          ]
-        }),
-      };
-    }
+    const skip = (page - 1) * limit;
 
     const [patients, totalCount] = await Promise.all([
       prisma.patient.findMany({
-        where: whereClause,
-        orderBy: {
-          [sortField]: 'asc',
-        },
-        skip: Number(startIdx),
-        take: Number(endIdx) - Number(startIdx),
+        where,
+        orderBy: { [sort]: order },
+        skip,
+        take: limit,
       }),
-      prisma.patient.count({ where: { studentId } }),
+      prisma.patient.count({ where }),
     ]);
 
     return res.status(200).json({ patients, totalCount });
-  } catch (error) {
-    console.error('[Get Patients Error]', error);
-    return res.status(500).json({ error: 'Failed to retrieve patients.' });
+  } catch (err) {
+    console.error("Failed to fetch patients:", err);
+    res.status(500).json({ error: 'Failed to fetch patients' });
   }
 };
 
@@ -106,31 +86,22 @@ exports.getPatients = async (req, res) => {
  */
 exports.getPatientNames = async (req, res) => {
   try {
-    const role = req.user?.role;
-    const studentId = req.user?.uid;
+    const { id: userId, role } = req.user;
 
-    let patientNames;
-    if (role == "Student") {
-      patientNames = await prisma.patient.findMany({
-        where: { studentId },
-        select: {
-          id: true,
-          name: true,
-        },
-      });
-    } else {
-      patientNames = await prisma.patient.findMany({
-        select: {
-          id: true,
-          name: true,
-        },
-      });
-    }
+    const where = role === 'Student' ? { studentId: userId } : {};
 
-    return res.status(200).json(patientNames);
-  } catch (error) {
-    console.error('[Get Patient Names Error]', error);
-    return res.status(500).json({ error: 'Failed to retrieve patient names.' });
+    const patients = await prisma.patient.findMany({
+      where,
+      select: {
+        id: true,
+        name: true
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    res.status(200).json(patients);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch patient names' });
   }
 };
 
@@ -154,27 +125,37 @@ exports.updatePatient = async (req, res) => {
   }
 };
 
-/**
- * Delete a patient and their associated appointments
- */
+// DELETE /patients/:id
 exports.deletePatient = async (req, res) => {
   try {
-    const studentId = req.user?.uid;
     const patientId = req.params.id;
+    const currentUserId = req.user?.id;
 
-    const patient = await prisma.patient.findUnique({ where: { id: patientId } });
-    if (!patient || patient.studentId !== studentId) {
-      return res.status(403).json({ error: 'Unauthorized or patient not found.' });
+    const patient = await prisma.patient.findUnique({
+      where: { id: patientId },
+      select: { id: true, studentId: true }, // Avoid fetching unnecessary data
+    });
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found.' });
+    }
+
+    if (patient.studentId !== currentUserId) {
+      return res.status(403).json({ error: 'You are not authorized to delete this patient.' });
     }
 
     const result = await prisma.$transaction([
-      prisma.appointment.deleteMany({ where: { patientId } }),
+      prisma.Incident.deleteMany({ where: { patientId } }),
       prisma.patient.delete({ where: { id: patientId } }),
     ]);
 
-    return res.status(200).json({ message: 'Patient and appointments deleted successfully', result });
+    return res.status(200).json({
+      message: 'Patient and appointments deleted successfully',
+      result,
+    });
   } catch (error) {
     console.error('[Delete Patient Error]', error);
     return res.status(500).json({ error: 'Failed to delete patient.' });
   }
 };
+
