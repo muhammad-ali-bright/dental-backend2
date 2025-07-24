@@ -39,47 +39,89 @@ exports.createPatient = async (req, res) => {
 };
 
 // GET /patients
+// GET /patients
 exports.getPatients = async (req, res) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role || 'Student';
+
     // Parse and sanitize query params
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search?.trim() || '';
     const sort = ['name', 'createdAt'].includes(req.query.sort) ? req.query.sort : 'name';
     const order = req.query.order === 'asc' ? 'asc' : 'desc';
-
-    // Construct filter
-    const where = {
-      ...(userRole === 'Student' && { studentId: userId }),
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
-          { contact: { contains: search, mode: 'insensitive' } },
-        ],
-      }),
-    };
-
     const skip = (page - 1) * limit;
 
-    const [patients, totalCount] = await Promise.all([
+    // Role-based base filter
+    let baseWhere = {};
+    if (userRole === 'Student') {
+      baseWhere.studentId = userId;
+    }
+
+    // Search filter (optional)
+    if (search) {
+      baseWhere.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { contact: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const today = new Date();
+    const age18 = new Date(today);
+    age18.setFullYear(age18.getFullYear() - 18);
+    const age65 = new Date(today);
+    age65.setFullYear(age65.getFullYear() - 65);
+
+    const [patients, totalCount, childrenCount, adultCount, seniorCount] = await Promise.all([
       prisma.patient.findMany({
-        where,
+        where: baseWhere,
         orderBy: { [sort]: order },
         skip,
         take: limit,
       }),
-      prisma.patient.count({ where }),
+      prisma.patient.count({ where: baseWhere }),
+      prisma.patient.count({
+        where: {
+          ...baseWhere,
+          dob: {
+            gte: age18, // younger than 18
+          },
+        },
+      }),
+      prisma.patient.count({
+        where: {
+          ...baseWhere,
+          dob: {
+            lt: age18,     // older than 18
+            gte: age65,    // younger than 65
+          },
+        },
+      }),
+      prisma.patient.count({
+        where: {
+          ...baseWhere,
+          dob: {
+            lt: age65, // 65+
+          },
+        },
+      }),
     ]);
 
-    return res.status(200).json({ patients, totalCount });
+    return res.status(200).json({
+      patients,
+      totalCount,
+      childrenCount,
+      adultCount,
+      seniorCount,
+    });
   } catch (err) {
     console.error("Failed to fetch patients:", err);
     res.status(500).json({ error: 'Failed to fetch patients' });
   }
 };
+
 
 /**
  * Fetch patient IDs and names for dropdowns/lists
