@@ -99,12 +99,12 @@ exports.getPatientById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!id || isNaN(id)) {
+    if (!id) {
       return res.status(400).json({ success: false, message: 'Invalid patient ID' });
     }
 
     const patient = await prisma.patient.findUnique({
-      where: { id: Number(id) },
+      where: { id: id },
     });
 
     if (!patient) {
