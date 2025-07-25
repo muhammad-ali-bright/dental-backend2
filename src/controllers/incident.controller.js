@@ -53,7 +53,14 @@ exports.getIncidents = async (req, res) => {
     }
   }
 
-  const [incidents, totalCount, completedCount, todayIncidents, overdueCount] = await Promise.all([
+  const [
+    incidents,
+    totalCount,
+    completedCount,
+    todayIncidents,
+    overdueCount,
+    upcomingIncidents
+  ] = await Promise.all([
     prisma.incident.findMany({
       where,
       include: { patient: true },
@@ -79,9 +86,18 @@ exports.getIncidents = async (req, res) => {
         status: 'Scheduled'
       }
     }),
+    prisma.incident.findMany({
+      where: {
+        ...baseWhere,
+        appointmentDate: { gt: new Date() },
+      },
+      include: { patient: true },
+      orderBy: { appointmentDate: 'asc' },
+      take: 5,
+    }),
   ]);
 
-  res.json({ incidents, totalCount, completedCount, todayIncidents, overdueCount });
+  res.json({ incidents, totalCount, completedCount, todayIncidents, overdueCount, upcomingIncidents });
 };
 
 exports.getPatientIncidents = async (req, res) => {
