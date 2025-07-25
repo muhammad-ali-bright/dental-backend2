@@ -53,7 +53,7 @@ exports.getIncidents = async (req, res) => {
     }
   }
 
-  const [incidents, totalCount, completedCount, todayCount, overdueCount] = await Promise.all([
+  const [incidents, totalCount, completedCount, todayIncidents, overdueCount] = await Promise.all([
     prisma.incident.findMany({
       where,
       include: { patient: true },
@@ -63,7 +63,7 @@ exports.getIncidents = async (req, res) => {
     }),
     prisma.incident.count({ where: baseWhere }),
     prisma.incident.count({ where: { ...baseWhere, status: 'Completed' } }),
-    prisma.incident.count({
+    prisma.incident.findMany({
       where: {
         ...baseWhere,
         appointmentDate: {
@@ -81,9 +81,52 @@ exports.getIncidents = async (req, res) => {
     }),
   ]);
 
-  res.json({ incidents, totalCount, completedCount, todayCount, overdueCount });
+  res.json({ incidents, totalCount, completedCount, todayIncidents, overdueCount });
 };
 
+exports.getPatientIncidents = async (req, res) => {
+  try {
+    const patientId = req.params.patientId;
+
+    const today = new Date();
+
+    // 1. Count incidents per patient (fix: use 'by: ['patientId']' instead of 'by: patientId')
+    const incidentsCount = await prisma.incident.groupBy({
+      by: ['patientId'],
+      where: {
+        studentId: req.user.id,
+        patientId,
+      },
+      _count: {
+        _all: true,
+      },
+    });
+
+    // 2. First upcoming incident (for this patient only)
+    const upcomingIncident = await prisma.incident.findFirst({
+      where: {
+        studentId: req.user.id,
+        patientId,
+        appointmentDate: { gte: today },
+        status: 'Scheduled',
+      },
+      orderBy: {
+        appointmentDate: 'asc',
+      },
+      select: {
+        appointmentDate: true,
+      },
+    });
+
+    return res.status(200).json({
+      totalIncidents: incidentsCount[0]?._count._all || 0,
+      nextScheduledAppointment: upcomingIncident?.appointmentDate || null,
+    });
+  } catch (error) {
+    console.error('[getPatientIncidents]', error);
+    return res.status(500).json({ error: 'Internal server error while fetching patient incidents.' });
+  }
+};
 
 exports.createIncident = async (req, res) => {
   try {

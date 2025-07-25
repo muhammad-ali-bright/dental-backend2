@@ -1,44 +1,16 @@
 const prisma = require('../prisma/client');
 
-// POST /patients
-exports.createPatient = async (req, res) => {
-  try {
-    const {
-      name,
-      dob,
-      email,
-      contact,
-      emergencyContact = null,
-      healthInfo = '',
-      address = ''
-    } = req.body;
-
-    // Validate required fields
-    if (!name || !dob || !email || !contact) {
-      return res.status(400).json({ error: 'Missing required fields: name, dob, email, or contact.' });
-    }
-
-    const payload = {
-      name: name.trim(),
-      dob: new Date(dob),
-      email: email.trim().toLowerCase(),
-      contact: contact.trim(),
-      emergencyContact: emergencyContact?.trim() || null,
-      healthInfo: healthInfo.trim(),
-      address: address.trim(),
-      studentId: req.user.id,
-    };
-
-    const patient = await prisma.patient.create({ data: payload });
-
-    return res.status(201).json(patient);
-  } catch (err) {
-    console.error('[createPatient]', err);
-    return res.status(500).json({ error: 'Internal server error while creating patient.' });
-  }
+// patientService.js or in same file above
+const fetchPatientNames = async (user) => {
+  const { id: userId, role } = user;
+  const where = role === 'Student' ? { studentId: userId } : {};
+  return await prisma.patient.findMany({
+    where,
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' }
+  });
 };
 
-// GET /patients
 // GET /patients
 exports.getPatients = async (req, res) => {
   try {
@@ -122,28 +94,80 @@ exports.getPatients = async (req, res) => {
   }
 };
 
+// GET /patients/:id
+exports.getPatientById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid patient ID' });
+    }
+
+    const patient = await prisma.patient.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!patient) {
+      return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+
+    return res.status(200).json(patient);
+  } catch (error) {
+    console.error('Error fetching patient by ID:', error);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+};
 
 /**
  * Fetch patient IDs and names for dropdowns/lists
  */
 exports.getPatientNames = async (req, res) => {
   try {
-    const { id: userId, role } = req.user;
-
-    const where = role === 'Student' ? { studentId: userId } : {};
-
-    const patients = await prisma.patient.findMany({
-      where,
-      select: {
-        id: true,
-        name: true
-      },
-      orderBy: { name: 'asc' }
-    });
-
+    const patients = await fetchPatientNames(req.user);
     res.status(200).json(patients);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch patient names' });
+  }
+};
+
+
+// POST /patients
+exports.createPatient = async (req, res) => {
+  try {
+    const {
+      name,
+      dob,
+      email,
+      contact,
+      emergencyContact = null,
+      healthInfo = '',
+      address = ''
+    } = req.body;
+
+    // Validate required fields
+    if (!name || !dob || !email || !contact) {
+      return res.status(400).json({ error: 'Missing required fields: name, dob, email, or contact.' });
+    }
+
+    const payload = {
+      name: name.trim(),
+      dob: new Date(dob),
+      email: email.trim().toLowerCase(),
+      contact: contact.trim(),
+      emergencyContact: emergencyContact?.trim() || null,
+      healthInfo: healthInfo.trim(),
+      address: address.trim(),
+      studentId: req.user.id,
+    };
+
+    await prisma.patient.create({ data: payload });
+
+    // Get updated patient names list
+    const patientNames = await fetchPatientNames(req.user);
+    return res.status(201).json(patientNames);
+  } catch (err) {
+    console.error('[createPatient]', err);
+    return res.status(500).json({ error: 'Internal server error while creating patient.' });
   }
 };
 
@@ -155,12 +179,14 @@ exports.updatePatient = async (req, res) => {
     const patientId = req.params.id;
     const updates = req.body;
 
-    const updatedPatient = await prisma.patient.update({
+    await prisma.patient.update({
       where: { id: patientId },
       data: updates,
     });
 
-    return res.status(200).json(updatedPatient);
+    // Get updated patient names list
+    const patientNames = await fetchPatientNames(req.user);
+    return res.status(201).json(patientNames);
   } catch (error) {
     console.error('[Update Patient Error]', error);
     return res.status(500).json({ error: 'Failed to update patient.' });
@@ -186,15 +212,14 @@ exports.deletePatient = async (req, res) => {
       return res.status(403).json({ error: 'You are not authorized to delete this patient.' });
     }
 
-    const result = await prisma.$transaction([
+    await prisma.$transaction([
       prisma.Incident.deleteMany({ where: { patientId } }),
       prisma.patient.delete({ where: { id: patientId } }),
     ]);
 
-    return res.status(200).json({
-      message: 'Patient and appointments deleted successfully',
-      result,
-    });
+    // Get updated patient names list
+    const patientNames = await fetchPatientNames(req.user);
+    return res.status(201).json(patientNames);
   } catch (error) {
     console.error('[Delete Patient Error]', error);
     return res.status(500).json({ error: 'Failed to delete patient.' });
