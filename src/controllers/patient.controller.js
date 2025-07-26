@@ -52,6 +52,16 @@ exports.getPatients = async (req, res) => {
         orderBy: { [sort]: order },
         skip,
         take: limit,
+        ...(userRole !== "Student" && {
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true
+              },
+            },
+          },
+        }),
       }),
       prisma.patient.count({ where: baseWhere }),
       prisma.patient.count({
