@@ -2,6 +2,7 @@ const prisma = require('../prisma/client');
 
 exports.getIncidents = async (req, res) => {
   const userRole = req.user?.role || 'Student';
+  const userId = req.user?.id;
   const { page = 1, pageSize = 10, status, date, search } = req.query;
   const offset = (page - 1) * pageSize;
 
