@@ -70,7 +70,7 @@ exports.getIncidents = async (req, res) => {
       include: { patient: true, user: true },
       skip: offset,
       take: parseInt(pageSize),
-      orderBy: { appointmentDate: 'asc' }
+      orderBy: { appointmentDate: 'desc' }
     }),
     prisma.incident.count({ where: baseWhere }),
     prisma.incident.count({ where: { ...baseWhere, status: 'Completed' } }),
@@ -148,6 +148,40 @@ exports.getPatientIncidents = async (req, res) => {
   }
 };
 
+exports.getIncidentsByRange = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const userRole = req.user?.role || 'Student';
+    const userId = req.user?.id;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'Start and end dates are required.' });
+    }
+
+    let where = {
+      appointmentDate: {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      },
+    };
+
+    if (userRole === 'Student') {
+      where.studentId = userId;
+    }
+
+    const incidents = await prisma.incident.findMany({
+      where,
+      include: { patient: true, user: true },
+      orderBy: { appointmentDate: 'asc' },
+    });
+
+    res.status(200).json({ success: true, incidents });
+  } catch (error) {
+    console.error('[getIncidentsByRange]', error);
+    res.status(500).json({ error: 'Internal server error while fetching incidents by range.' });
+  }
+};
+
 exports.createIncident = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -157,6 +191,8 @@ exports.createIncident = async (req, res) => {
       description,
       comments,
       appointmentDate,
+      startTime,   // ✅ NEW
+      endTime,     // ✅ NEW
       cost,
       treatment,
       status,
@@ -170,6 +206,8 @@ exports.createIncident = async (req, res) => {
         description,
         comments,
         appointmentDate: new Date(appointmentDate),
+        startTime,   // ✅ Save as string (e.g., "10:00 AM")
+        endTime,     // ✅ Save as string
         cost: Number(cost),
         treatment,
         status,
@@ -183,6 +221,7 @@ exports.createIncident = async (req, res) => {
   }
 };
 
+
 exports.updateIncident = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -193,12 +232,13 @@ exports.updateIncident = async (req, res) => {
       description,
       comments,
       appointmentDate,
+      startTime,   // ✅ NEW
+      endTime,     // ✅ NEW
       cost,
       treatment,
       status,
     } = req.body;
 
-    // Ensure incident belongs to user
     const existing = await prisma.incident.findUnique({ where: { id } });
     if (!existing || existing.studentId !== studentId) {
       return res.status(403).json({ success: false, message: 'Unauthorized or not found' });
@@ -212,6 +252,8 @@ exports.updateIncident = async (req, res) => {
         description,
         comments,
         appointmentDate: new Date(appointmentDate),
+        startTime,   // ✅ Updated field
+        endTime,     // ✅ Updated field
         cost: Number(cost),
         treatment,
         status,
