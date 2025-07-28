@@ -42,6 +42,8 @@ model Incident {
   description     String
   comments        String
   appointmentDate DateTime
+  startTime       DateTime
+  endTime         DateTime
   cost            Int
   treatment       String
   status          String

@@ -1,4 +1,5 @@
 const prisma = require('../prisma/client');
+const { parseLocalDateTime } = require('../utils/parseLocalDateTime');
 
 exports.getIncidents = async (req, res) => {
   const userRole = req.user?.role || 'Student';
@@ -70,7 +71,7 @@ exports.getIncidents = async (req, res) => {
       include: { patient: true, user: true },
       skip: offset,
       take: parseInt(pageSize),
-      orderBy: { appointmentDate: 'asc' }
+      orderBy: { appointmentDate: 'desc' }
     }),
     prisma.incident.count({ where: baseWhere }),
     prisma.incident.count({ where: { ...baseWhere, status: 'Completed' } }),
@@ -107,10 +108,8 @@ exports.getIncidents = async (req, res) => {
 exports.getPatientIncidents = async (req, res) => {
   try {
     const patientId = req.params.patientId;
-
     const today = new Date();
 
-    // 1. Count incidents per patient (fix: use 'by: ['patientId']' instead of 'by: patientId')
     const incidentsCount = await prisma.incident.groupBy({
       by: ['patientId'],
       where: {
@@ -122,7 +121,6 @@ exports.getPatientIncidents = async (req, res) => {
       },
     });
 
-    // 2. First upcoming incident (for this patient only)
     const upcomingIncident = await prisma.incident.findFirst({
       where: {
         studentId: req.user.id,
@@ -148,6 +146,40 @@ exports.getPatientIncidents = async (req, res) => {
   }
 };
 
+exports.getIncidentsByRange = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const userRole = req.user?.role || 'Student';
+    const userId = req.user?.id;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'Start and end dates are required.' });
+    }
+
+    let where = {
+      appointmentDate: {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      },
+    };
+
+    if (userRole === 'Student') {
+      where.studentId = userId;
+    }
+
+    const incidents = await prisma.incident.findMany({
+      where,
+      include: { patient: true, user: true },
+      orderBy: { appointmentDate: 'asc' },
+    });
+
+    res.status(200).json({ success: true, incidents });
+  } catch (error) {
+    console.error('[getIncidentsByRange]', error);
+    res.status(500).json({ error: 'Internal server error while fetching incidents by range.' });
+  }
+};
+
 exports.createIncident = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -156,11 +188,16 @@ exports.createIncident = async (req, res) => {
       title,
       description,
       comments,
-      appointmentDate,
+      date,
+      startTime,
+      endTime,
       cost,
       treatment,
       status,
     } = req.body;
+
+    const appointmentDate = parseLocalDateTime(date, startTime);
+    const appointmentEndTime = parseLocalDateTime(date, endTime);
 
     const incident = await prisma.incident.create({
       data: {
@@ -169,7 +206,9 @@ exports.createIncident = async (req, res) => {
         title,
         description,
         comments,
-        appointmentDate: new Date(appointmentDate),
+        appointmentDate,
+        startTime: appointmentDate,
+        endTime: appointmentEndTime,
         cost: Number(cost),
         treatment,
         status,
@@ -192,17 +231,21 @@ exports.updateIncident = async (req, res) => {
       title,
       description,
       comments,
-      appointmentDate,
+      date,
+      startTime,
+      endTime,
       cost,
       treatment,
       status,
     } = req.body;
 
-    // Ensure incident belongs to user
     const existing = await prisma.incident.findUnique({ where: { id } });
     if (!existing || existing.studentId !== studentId) {
       return res.status(403).json({ success: false, message: 'Unauthorized or not found' });
     }
+
+    const appointmentDate = parseLocalDateTime(date, startTime);
+    const appointmentEndTime = parseLocalDateTime(date, endTime);
 
     const updatedIncident = await prisma.incident.update({
       where: { id },
@@ -211,7 +254,9 @@ exports.updateIncident = async (req, res) => {
         title,
         description,
         comments,
-        appointmentDate: new Date(appointmentDate),
+        appointmentDate,
+        startTime: appointmentDate,
+        endTime: appointmentEndTime,
         cost: Number(cost),
         treatment,
         status,
@@ -239,7 +284,7 @@ exports.updateIncidentStatus = async (req, res) => {
     console.error('Error updating status:', err);
     res.status(500).json({ success: false, message: 'Failed to update status' });
   }
-}
+};
 
 exports.deleteIncident = async (req, res) => {
   const id = req.params.id;
@@ -252,4 +297,4 @@ exports.deleteIncident = async (req, res) => {
     console.error('Delete error:', err);
     res.status(500).json({ success: false, message: 'Failed to delete incident' });
   }
-}
+};
