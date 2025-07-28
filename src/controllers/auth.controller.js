@@ -16,7 +16,7 @@ exports.login = async (req, res) => {
       return res.status(200).json({ success: false, result: 'Incorrect email or password. Please try again.' });
     }
 
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
     // Password check logic goes here if you are storing password hashes
     return res.status(200).json({ success: true, result: { token, user } });
   } catch (error) {

@@ -1,6 +1,13 @@
 const prisma = require('../prisma/client');
 
-// patientService.js or in same file above
+// ⏰ Date parsing helper
+function parseLocalDateTime(dateStr, timeStr) {
+  if (!dateStr || typeof dateStr !== 'string') return null;
+  const datetime = new Date(`${dateStr}T${timeStr}`);
+  return isNaN(datetime.getTime()) ? null : datetime;
+}
+
+// Utility: fetch dropdown-friendly patient names
 const fetchPatientNames = async (user) => {
   const { id: userId, role } = user;
   const where = role === 'Student' ? { studentId: userId } : {};
@@ -16,8 +23,6 @@ exports.getPatients = async (req, res) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role || 'Student';
-
-    // Parse and sanitize query params
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search?.trim() || '';
@@ -25,13 +30,11 @@ exports.getPatients = async (req, res) => {
     const order = req.query.order === 'asc' ? 'asc' : 'desc';
     const skip = (page - 1) * limit;
 
-    // Role-based base filter
     let baseWhere = {};
     if (userRole === 'Student') {
       baseWhere.studentId = userId;
     }
 
-    // Search filter (optional)
     if (search) {
       baseWhere.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -55,40 +58,15 @@ exports.getPatients = async (req, res) => {
         ...(userRole !== "Student" && {
           include: {
             user: {
-              select: {
-                name: true,
-                email: true
-              },
+              select: { name: true, email: true },
             },
           },
         }),
       }),
       prisma.patient.count({ where: baseWhere }),
-      prisma.patient.count({
-        where: {
-          ...baseWhere,
-          dob: {
-            gte: age18, // younger than 18
-          },
-        },
-      }),
-      prisma.patient.count({
-        where: {
-          ...baseWhere,
-          dob: {
-            lt: age18,     // older than 18
-            gte: age65,    // younger than 65
-          },
-        },
-      }),
-      prisma.patient.count({
-        where: {
-          ...baseWhere,
-          dob: {
-            lt: age65, // 65+
-          },
-        },
-      }),
+      prisma.patient.count({ where: { ...baseWhere, dob: { gte: age18 } } }),
+      prisma.patient.count({ where: { ...baseWhere, dob: { lt: age18, gte: age65 } } }),
+      prisma.patient.count({ where: { ...baseWhere, dob: { lt: age65 } } }),
     ]);
 
     return res.status(200).json({
@@ -108,15 +86,11 @@ exports.getPatients = async (req, res) => {
 exports.getPatientById = async (req, res) => {
   try {
     const { id } = req.params;
-
     if (!id) {
       return res.status(400).json({ success: false, message: 'Invalid patient ID' });
     }
 
-    const patient = await prisma.patient.findUnique({
-      where: { id: id },
-    });
-
+    const patient = await prisma.patient.findUnique({ where: { id } });
     if (!patient) {
       return res.status(404).json({ success: false, message: 'Patient not found' });
     }
@@ -128,9 +102,7 @@ exports.getPatientById = async (req, res) => {
   }
 };
 
-/**
- * Fetch patient IDs and names for dropdowns/lists
- */
+// GET /patients/names
 exports.getPatientNames = async (req, res) => {
   try {
     const patients = await fetchPatientNames(req.user);
@@ -139,7 +111,6 @@ exports.getPatientNames = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch patient names' });
   }
 };
-
 
 // POST /patients
 exports.createPatient = async (req, res) => {
@@ -154,14 +125,18 @@ exports.createPatient = async (req, res) => {
       address = ''
     } = req.body;
 
-    // Validate required fields
     if (!name || !dob || !email || !contact) {
       return res.status(400).json({ error: 'Missing required fields: name, dob, email, or contact.' });
     }
 
+    const parsedDob = parseLocalDateTime(dob, '00:00');
+    if (!parsedDob) {
+      return res.status(400).json({ error: 'Invalid date of birth format.' });
+    }
+
     const payload = {
       name: name.trim(),
-      dob: new Date(dob),
+      dob: parsedDob,
       email: email.trim().toLowerCase(),
       contact: contact.trim(),
       emergencyContact: emergencyContact?.trim() || null,
@@ -172,7 +147,6 @@ exports.createPatient = async (req, res) => {
 
     await prisma.patient.create({ data: payload });
 
-    // Get updated patient names list
     const patientNames = await fetchPatientNames(req.user);
     return res.status(201).json(patientNames);
   } catch (err) {
@@ -181,20 +155,31 @@ exports.createPatient = async (req, res) => {
   }
 };
 
-/**
- * Update an existing patient record by ID
- */
+// PUT /patients/:id
 exports.updatePatient = async (req, res) => {
   try {
     const patientId = req.params.id;
-    const updates = req.body;
+
+    // Parse dob only if provided
+    let parsedDob;
+    if ('dob' in req.body) {
+      parsedDob = parseLocalDateTime(req.body.dob, '00:00');
+      if (!parsedDob) {
+        return res.status(400).json({ error: 'Invalid date of birth format.' });
+      }
+    }
+
+    // Build update payload
+    const updates = {
+      ...req.body,
+      ...(parsedDob && { dob: parsedDob }),
+    };
 
     await prisma.patient.update({
       where: { id: patientId },
       data: updates,
     });
 
-    // Get updated patient names list
     const patientNames = await fetchPatientNames(req.user);
     return res.status(201).json(patientNames);
   } catch (error) {
@@ -211,7 +196,7 @@ exports.deletePatient = async (req, res) => {
 
     const patient = await prisma.patient.findUnique({
       where: { id: patientId },
-      select: { id: true, studentId: true }, // Avoid fetching unnecessary data
+      select: { id: true, studentId: true },
     });
 
     if (!patient) {
@@ -227,7 +212,6 @@ exports.deletePatient = async (req, res) => {
       prisma.patient.delete({ where: { id: patientId } }),
     ]);
 
-    // Get updated patient names list
     const patientNames = await fetchPatientNames(req.user);
     return res.status(201).json(patientNames);
   } catch (error) {
@@ -235,4 +219,3 @@ exports.deletePatient = async (req, res) => {
     return res.status(500).json({ error: 'Failed to delete patient.' });
   }
 };
-
