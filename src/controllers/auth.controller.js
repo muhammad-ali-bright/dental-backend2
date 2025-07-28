@@ -23,8 +23,9 @@ exports.googleLogin = async (req, res) => {
       return res.status(200).json({ success: false, exists: false, result: "User not registered" });
     }
 
-    const token = generateToken(user);
-    return res.status(200).json({ success: true, exists: true, result: { token, user } });
+    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+    // Password check logic goes here if you are storing password hashes
+    return res.status(200).json({ success: true, result: { token, user } });
   } catch (error) {
     console.error("Google login error:", error);
     return res.status(401).json({ success: false, result: "Invalid Firebase token" });
