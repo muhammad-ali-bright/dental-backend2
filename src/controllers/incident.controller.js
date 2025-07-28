@@ -1,4 +1,5 @@
 const prisma = require('../prisma/client');
+const { parseLocalDateTime } = require('../utils/parseLocalDateTime');
 
 exports.getIncidents = async (req, res) => {
   const userRole = req.user?.role || 'Student';
@@ -107,10 +108,8 @@ exports.getIncidents = async (req, res) => {
 exports.getPatientIncidents = async (req, res) => {
   try {
     const patientId = req.params.patientId;
-
     const today = new Date();
 
-    // 1. Count incidents per patient (fix: use 'by: ['patientId']' instead of 'by: patientId')
     const incidentsCount = await prisma.incident.groupBy({
       by: ['patientId'],
       where: {
@@ -122,7 +121,6 @@ exports.getPatientIncidents = async (req, res) => {
       },
     });
 
-    // 2. First upcoming incident (for this patient only)
     const upcomingIncident = await prisma.incident.findFirst({
       where: {
         studentId: req.user.id,
@@ -190,13 +188,16 @@ exports.createIncident = async (req, res) => {
       title,
       description,
       comments,
-      appointmentDate,
-      startTime,   // ✅ NEW
-      endTime,     // ✅ NEW
+      date,
+      startTime,
+      endTime,
       cost,
       treatment,
       status,
     } = req.body;
+
+    const appointmentDate = parseLocalDateTime(date, startTime);
+    const appointmentEndTime = parseLocalDateTime(date, endTime);
 
     const incident = await prisma.incident.create({
       data: {
@@ -205,9 +206,9 @@ exports.createIncident = async (req, res) => {
         title,
         description,
         comments,
-        appointmentDate: new Date(appointmentDate),
-        startTime,   // ✅ Save as string (e.g., "10:00 AM")
-        endTime,     // ✅ Save as string
+        appointmentDate,
+        startTime: appointmentDate,
+        endTime: appointmentEndTime,
         cost: Number(cost),
         treatment,
         status,
@@ -221,7 +222,6 @@ exports.createIncident = async (req, res) => {
   }
 };
 
-
 exports.updateIncident = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -231,9 +231,9 @@ exports.updateIncident = async (req, res) => {
       title,
       description,
       comments,
-      appointmentDate,
-      startTime,   // ✅ NEW
-      endTime,     // ✅ NEW
+      date,
+      startTime,
+      endTime,
       cost,
       treatment,
       status,
@@ -244,6 +244,9 @@ exports.updateIncident = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Unauthorized or not found' });
     }
 
+    const appointmentDate = parseLocalDateTime(date, startTime);
+    const appointmentEndTime = parseLocalDateTime(date, endTime);
+
     const updatedIncident = await prisma.incident.update({
       where: { id },
       data: {
@@ -251,9 +254,9 @@ exports.updateIncident = async (req, res) => {
         title,
         description,
         comments,
-        appointmentDate: new Date(appointmentDate),
-        startTime,   // ✅ Updated field
-        endTime,     // ✅ Updated field
+        appointmentDate,
+        startTime: appointmentDate,
+        endTime: appointmentEndTime,
         cost: Number(cost),
         treatment,
         status,
@@ -281,7 +284,7 @@ exports.updateIncidentStatus = async (req, res) => {
     console.error('Error updating status:', err);
     res.status(500).json({ success: false, message: 'Failed to update status' });
   }
-}
+};
 
 exports.deleteIncident = async (req, res) => {
   const id = req.params.id;
@@ -294,4 +297,4 @@ exports.deleteIncident = async (req, res) => {
     console.error('Delete error:', err);
     res.status(500).json({ success: false, message: 'Failed to delete incident' });
   }
-}
+};
