@@ -4,6 +4,9 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const admin = require("../utils/firebaseAdmin");
 const prisma = require("../prisma/client");
 
+const bcrypt = require("bcrypt");
+const SALT_ROUNDS = 10;
+
 // 🎯 Issue JWT
 function generateToken(user) {
   return jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
@@ -73,15 +76,25 @@ exports.completeGoogleRegistration = async (req, res) => {
 
 // 🧾 Register – Manual form registration
 exports.register = async (req, res) => {
-  const { role, name, email } = req.body;
+  const { role, name, email, password } = req.body;
 
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(201).json({ success: false, result: "User already exists" });
+      return res.status(409).json({ success: false, result: "User already exists" });
     }
 
-    const newUser = await prisma.user.create({ data: { email, role, name } });
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+    const newUser = await prisma.user.create({
+      data: {
+        email,
+        name,
+        role,
+        password: hashedPassword,
+      },
+    });
+
     return res.status(201).json({ success: true, result: newUser });
   } catch (err) {
     console.error("Registration error:", err);
@@ -91,12 +104,18 @@ exports.register = async (req, res) => {
 
 // 🔐 Email/password Login – if you still need it
 exports.login = async (req, res) => {
-  const { email } = req.body;
+  const { email, password } = req.body;
 
   try {
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(200).json({ success: false, result: "Incorrect email or password" });
+
+    if (!user || !user.password) {
+      return res.status(201).json({ success: false, result: "Invalid email or password" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(201).json({ success: false, result: "Invalid email or password" });
     }
 
     const token = generateToken(user);

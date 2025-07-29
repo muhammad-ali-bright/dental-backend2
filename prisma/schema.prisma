@@ -12,6 +12,7 @@ model User {
   role     String
   email    String @unique
   name     String
+  password String? // optional for Google-only users
 
   patients  Patient[]
   incidents Incident[]
