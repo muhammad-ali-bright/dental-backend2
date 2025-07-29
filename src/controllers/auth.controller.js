@@ -20,15 +20,28 @@ exports.googleLogin = async (req, res) => {
     const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      return res.status(200).json({ success: false, exists: false, result: "User not registered" });
+      // User exists in Firebase, but not in DB
+      return res.status(200).json({
+        success: true,
+        alreadyExists: false,
+        message: "User not found in DB",
+      });
     }
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-    // Password check logic goes here if you are storing password hashes
-    return res.status(200).json({ success: true, result: { token, user } });
+
+    return res.status(200).json({
+      success: true,
+      alreadyExists: true,
+      result: { token, user },
+    });
+
   } catch (error) {
     console.error("Google login error:", error);
-    return res.status(401).json({ success: false, result: "Invalid Firebase token" });
+    return res.status(401).json({
+      success: false,
+      message: "Invalid Firebase token",
+    });
   }
 };
 
