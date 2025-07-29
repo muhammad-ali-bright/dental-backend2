@@ -1,40 +1,34 @@
 const prisma = require('../prisma/client');
 
-// ⏰ Date parsing helper
-function parseLocalDateTime(dateStr, timeStr) {
+// ⏰ Helper: Parse date & time into Date object
+const parseLocalDateTime = (dateStr, timeStr = '00:00') => {
   if (!dateStr || typeof dateStr !== 'string') return null;
   const datetime = new Date(`${dateStr}T${timeStr}`);
   return isNaN(datetime.getTime()) ? null : datetime;
-}
+};
 
-// Utility: fetch dropdown-friendly patient names
+// 🧾 Helper: Fetch dropdown-friendly patient names
 const fetchPatientNames = async (user) => {
-  const { id: userId, role } = user;
-  const where = role === 'Student' ? { studentId: userId } : {};
-  return await prisma.patient.findMany({
+  const where = user.role === 'Student' ? { studentId: user.id } : {};
+  return prisma.patient.findMany({
     where,
     select: { id: true, name: true },
-    orderBy: { name: 'asc' }
+    orderBy: { name: 'asc' },
   });
 };
 
 // GET /patients
 exports.getPatients = async (req, res) => {
   try {
-    const userId = req.user?.id;
-    const userRole = req.user?.role || 'Student';
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const { id: userId, role = 'Student' } = req.user || {};
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
     const search = req.query.search?.trim() || '';
     const sort = ['name', 'createdAt'].includes(req.query.sort) ? req.query.sort : 'name';
     const order = req.query.order === 'asc' ? 'asc' : 'desc';
     const skip = (page - 1) * limit;
 
-    let baseWhere = {};
-    if (userRole === 'Student') {
-      baseWhere.studentId = userId;
-    }
-
+    const baseWhere = role === 'Student' ? { studentId: userId } : {};
     if (search) {
       baseWhere.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -43,11 +37,10 @@ exports.getPatients = async (req, res) => {
       ];
     }
 
+    // Age-based filters
     const today = new Date();
-    const age18 = new Date(today);
-    age18.setFullYear(age18.getFullYear() - 18);
-    const age65 = new Date(today);
-    age65.setFullYear(age65.getFullYear() - 65);
+    const age18 = new Date(today.setFullYear(today.getFullYear() - 18));
+    const age65 = new Date(today.setFullYear(today.getFullYear() - 65));
 
     const [patients, totalCount, childrenCount, adultCount, seniorCount] = await Promise.all([
       prisma.patient.findMany({
@@ -55,12 +48,8 @@ exports.getPatients = async (req, res) => {
         orderBy: { [sort]: order },
         skip,
         take: limit,
-        ...(userRole !== "Student" && {
-          include: {
-            user: {
-              select: { name: true, email: true },
-            },
-          },
+        ...(role !== 'Student' && {
+          include: { user: { select: { name: true, email: true } } },
         }),
       }),
       prisma.patient.count({ where: baseWhere }),
@@ -69,15 +58,9 @@ exports.getPatients = async (req, res) => {
       prisma.patient.count({ where: { ...baseWhere, dob: { lt: age65 } } }),
     ]);
 
-    return res.status(200).json({
-      patients,
-      totalCount,
-      childrenCount,
-      adultCount,
-      seniorCount,
-    });
+    res.status(200).json({ patients, totalCount, childrenCount, adultCount, seniorCount });
   } catch (err) {
-    console.error("Failed to fetch patients:", err);
+    console.error('[getPatients]', err);
     res.status(500).json({ error: 'Failed to fetch patients' });
   }
 };
@@ -86,19 +69,15 @@ exports.getPatients = async (req, res) => {
 exports.getPatientById = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!id) {
-      return res.status(400).json({ success: false, message: 'Invalid patient ID' });
-    }
+    if (!id) return res.status(400).json({ success: false, message: 'Invalid patient ID' });
 
     const patient = await prisma.patient.findUnique({ where: { id } });
-    if (!patient) {
-      return res.status(404).json({ success: false, message: 'Patient not found' });
-    }
+    if (!patient) return res.status(404).json({ success: false, message: 'Patient not found' });
 
-    return res.status(200).json(patient);
+    res.status(200).json(patient);
   } catch (error) {
-    console.error('Error fetching patient by ID:', error);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
+    console.error('[getPatientById]', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 };
 
@@ -108,6 +87,7 @@ exports.getPatientNames = async (req, res) => {
     const patients = await fetchPatientNames(req.user);
     res.status(200).json(patients);
   } catch (err) {
+    console.error('[getPatientNames]', err);
     res.status(500).json({ error: 'Failed to fetch patient names' });
   }
 };
@@ -115,24 +95,13 @@ exports.getPatientNames = async (req, res) => {
 // POST /patients
 exports.createPatient = async (req, res) => {
   try {
-    const {
-      name,
-      dob,
-      email,
-      contact,
-      emergencyContact = null,
-      healthInfo = '',
-      address = ''
-    } = req.body;
-
+    const { name, dob, email, contact, emergencyContact = null, healthInfo = '', address = '' } = req.body;
     if (!name || !dob || !email || !contact) {
       return res.status(400).json({ error: 'Missing required fields: name, dob, email, or contact.' });
     }
 
-    const parsedDob = parseLocalDateTime(dob, '00:00');
-    if (!parsedDob) {
-      return res.status(400).json({ error: 'Invalid date of birth format.' });
-    }
+    const parsedDob = parseLocalDateTime(dob);
+    if (!parsedDob) return res.status(400).json({ error: 'Invalid date of birth format.' });
 
     const payload = {
       name: name.trim(),
@@ -146,76 +115,64 @@ exports.createPatient = async (req, res) => {
     };
 
     await prisma.patient.create({ data: payload });
-
     const patientNames = await fetchPatientNames(req.user);
-    return res.status(201).json(patientNames);
+
+    res.status(201).json(patientNames);
   } catch (err) {
     console.error('[createPatient]', err);
-    return res.status(500).json({ error: 'Internal server error while creating patient.' });
+    res.status(500).json({ error: 'Internal server error while creating patient.' });
   }
 };
 
 // PUT /patients/:id
 exports.updatePatient = async (req, res) => {
   try {
-    const patientId = req.params.id;
+    const { id } = req.params;
 
-    // Parse dob only if provided
     let parsedDob;
-    if ('dob' in req.body) {
-      parsedDob = parseLocalDateTime(req.body.dob, '00:00');
-      if (!parsedDob) {
-        return res.status(400).json({ error: 'Invalid date of birth format.' });
-      }
+    if (req.body.dob) {
+      parsedDob = parseLocalDateTime(req.body.dob);
+      if (!parsedDob) return res.status(400).json({ error: 'Invalid date of birth format.' });
     }
 
-    // Build update payload
-    const updates = {
-      ...req.body,
-      ...(parsedDob && { dob: parsedDob }),
-    };
-
     await prisma.patient.update({
-      where: { id: patientId },
-      data: updates,
+      where: { id },
+      data: { ...req.body, ...(parsedDob && { dob: parsedDob }) },
     });
 
     const patientNames = await fetchPatientNames(req.user);
-    return res.status(201).json(patientNames);
+    res.status(201).json(patientNames);
   } catch (error) {
-    console.error('[Update Patient Error]', error);
-    return res.status(500).json({ error: 'Failed to update patient.' });
+    console.error('[updatePatient]', error);
+    res.status(500).json({ error: 'Failed to update patient.' });
   }
 };
 
 // DELETE /patients/:id
 exports.deletePatient = async (req, res) => {
   try {
-    const patientId = req.params.id;
+    const { id } = req.params;
     const currentUserId = req.user?.id;
 
     const patient = await prisma.patient.findUnique({
-      where: { id: patientId },
+      where: { id },
       select: { id: true, studentId: true },
     });
 
-    if (!patient) {
-      return res.status(404).json({ error: 'Patient not found.' });
-    }
-
+    if (!patient) return res.status(404).json({ error: 'Patient not found.' });
     if (patient.studentId !== currentUserId) {
       return res.status(403).json({ error: 'You are not authorized to delete this patient.' });
     }
 
     await prisma.$transaction([
-      prisma.Incident.deleteMany({ where: { patientId } }),
-      prisma.patient.delete({ where: { id: patientId } }),
+      prisma.incident.deleteMany({ where: { patientId: id } }),
+      prisma.patient.delete({ where: { id } }),
     ]);
 
     const patientNames = await fetchPatientNames(req.user);
-    return res.status(201).json(patientNames);
+    res.status(201).json(patientNames);
   } catch (error) {
-    console.error('[Delete Patient Error]', error);
-    return res.status(500).json({ error: 'Failed to delete patient.' });
+    console.error('[deletePatient]', error);
+    res.status(500).json({ error: 'Failed to delete patient.' });
   }
 };
