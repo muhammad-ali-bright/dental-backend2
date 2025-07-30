@@ -61,6 +61,7 @@ exports.getIncidents = async (req, res) => {
   const [
     incidents,
     totalCount,
+    filteredTotalCount,
     completedCount,
     todayIncidents,
     overdueCount,
@@ -74,6 +75,7 @@ exports.getIncidents = async (req, res) => {
       orderBy: { appointmentDate: 'desc' }
     }),
     prisma.incident.count({ where: baseWhere }),
+    prisma.incident.count({ where }),
     prisma.incident.count({ where: { ...baseWhere, status: 'Completed' } }),
     prisma.incident.findMany({
       where: {
@@ -102,7 +104,7 @@ exports.getIncidents = async (req, res) => {
     }),
   ]);
 
-  res.json({ incidents, totalCount, completedCount, todayIncidents, overdueCount, upcomingIncidents });
+  res.json({ incidents, totalCount, filteredTotalCount, completedCount, todayIncidents, overdueCount, upcomingIncidents });
 };
 
 exports.getPatientIncidents = async (req, res) => {

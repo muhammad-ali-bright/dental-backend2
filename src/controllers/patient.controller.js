@@ -29,22 +29,25 @@ exports.getPatients = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const baseWhere = role === 'Student' ? { studentId: userId } : {};
-    if (search) {
-      baseWhere.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { contact: { contains: search, mode: 'insensitive' } },
-      ];
-    }
+    const where = {
+      ...baseWhere,
+      ...(search && {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { contact: { contains: search, mode: 'insensitive' } },
+        ],
+      }),
+    };
 
-    // Age-based filters
-    const today = new Date();
-    const age18 = new Date(today.setFullYear(today.getFullYear() - 18));
-    const age65 = new Date(today.setFullYear(today.getFullYear() - 65));
+    // Correct age calculation
+    const now = new Date();
+    const age18 = new Date(now.getFullYear() - 18, now.getMonth(), now.getDate());
+    const age65 = new Date(now.getFullYear() - 65, now.getMonth(), now.getDate());
 
-    const [patients, totalCount, childrenCount, adultCount, seniorCount] = await Promise.all([
+    const [patients, filteredTotalCount, childrenCount, adultCount, seniorCount, totalCount] = await Promise.all([
       prisma.patient.findMany({
-        where: baseWhere,
+        where,
         orderBy: { [sort]: order },
         skip,
         take: limit,
@@ -52,15 +55,23 @@ exports.getPatients = async (req, res) => {
           include: { user: { select: { name: true, email: true } } },
         }),
       }),
-      prisma.patient.count({ where: baseWhere }),
-      prisma.patient.count({ where: { ...baseWhere, dob: { gte: age18 } } }),
-      prisma.patient.count({ where: { ...baseWhere, dob: { lt: age18, gte: age65 } } }),
-      prisma.patient.count({ where: { ...baseWhere, dob: { lt: age65 } } }),
+      prisma.patient.count({ where }),
+      prisma.patient.count({ where: { ...baseWhere, dob: { gte: age18 } } }), // children
+      prisma.patient.count({ where: { ...baseWhere, dob: { lt: age18, gte: age65 } } }), // adults
+      prisma.patient.count({ where: { ...baseWhere, dob: { lt: age65 } } }), // seniors
+      prisma.patient.count({ where: baseWhere }), // total
     ]);
 
-    res.status(200).json({ patients, totalCount, childrenCount, adultCount, seniorCount });
-  } catch (err) {
-    console.error('[getPatients]', err);
+    res.status(200).json({
+      patients,
+      filteredTotalCount,
+      totalCount,
+      childrenCount,
+      adultCount,
+      seniorCount,
+    });
+  } catch (error) {
+    console.error('[getPatients]', error);
     res.status(500).json({ error: 'Failed to fetch patients' });
   }
 };
