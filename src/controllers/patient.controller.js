@@ -20,7 +20,7 @@ const fetchPatientNames = async (user) => {
 // GET /patients
 exports.getPatients = async (req, res) => {
   try {
-    const { id: userId, role = 'Student' } = req.user || {};
+    const { id: userId, role } = req.user || {};
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     const search = req.query.search?.trim() || '';

@@ -109,15 +109,18 @@ exports.getIncidents = async (req, res) => {
 
 exports.getPatientIncidents = async (req, res) => {
   try {
+    const { id: userId, role } = req.user;
     const patientId = req.params.patientId;
     const today = new Date();
 
+    const baseWhere = {
+      patientId,
+      ...(role === 'Student' && { studentId: userId })
+    };
+
     const incidentsCount = await prisma.incident.groupBy({
       by: ['patientId'],
-      where: {
-        studentId: req.user.id,
-        patientId,
-      },
+      where: baseWhere,
       _count: {
         _all: true,
       },
@@ -125,8 +128,7 @@ exports.getPatientIncidents = async (req, res) => {
 
     const upcomingIncident = await prisma.incident.findFirst({
       where: {
-        studentId: req.user.id,
-        patientId,
+        ...baseWhere,
         appointmentDate: { gte: today },
         status: 'Scheduled',
       },
