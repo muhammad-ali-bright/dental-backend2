@@ -9,6 +9,7 @@ const authRoutes = require('./routes/auth.routes')
 const usersRoutes = require('./routes/users.routes')
 const patientRoutes = require('./routes/patient.routes')
 const incidentRoutes = require('./routes/incident.routes')
+const chatbotRoutes = require('./routes/chatbot.routes')
 
 
 const app = express()
@@ -28,6 +29,7 @@ app.use('/api/users', usersRoutes)
 
 app.use('/api/patients', authenticate, patientRoutes)
 app.use('/api/incidents', authenticate, incidentRoutes)
+app.use("/api/chatbot", authenticate, chatbotRoutes)
 
 // ——— Health Check ———
 app.get('/', (req, res) => res.send('Denta API Running'))
